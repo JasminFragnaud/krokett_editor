@@ -1,0 +1,16 @@
+[package]
+name = "krokett_editor_android"
+version.workspace = true
+edition = "2021"
+publish = false
+
+[dependencies]
+log = "0.4"
+android_logger = "0.15"
+eframe = { workspace = true, features = ["wgpu", "android-game-activity"] }
+egui-winit.workspace = true
+krokett_editor = { path = "../../krokett_editor" }
+
+[lib]
+name = "main"
+crate-type = ["cdylib"]

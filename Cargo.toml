@@ -1,0 +1,15 @@
+[workspace]
+members = ["krokett_editor", "krokett_editor_native", "krokett_editor_web", "krokett_editor_android/rust"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+
+[workspace.dependencies]
+walkers = "0.52.0"
+log = "0.4.29"
+egui = "0.33.3"
+egui_extras = { version = "0.33.3", features = ["svg"] }
+eframe = "0.33.3"
+egui-winit = "0.33.3"
+

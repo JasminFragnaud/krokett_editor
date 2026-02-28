@@ -1,0 +1,14 @@
+/target
+/krokett_editor/target
+/krokett_editor_native/target
+/krokett_editor_android/java/.gradle
+/krokett_editor_android/java/local.properties
+/krokett_editor_android/java/.idea
+/krokett_editor_android/java/app/build
+/krokett_editor_android/java/app/src/main/jniLibs
+/krokett_editor_web/dist
+
+# Path where `demo_native` stores the HTTP cache.
+.cache
+
+.DS_Store

@@ -1,0 +1,12 @@
+[package]
+name = "krokett_editor_native"
+version.workspace = true
+edition = "2021"
+publish = false
+default-run = "krokett_editor_native"
+
+[dependencies]
+krokett_editor = { path = "../krokett_editor" }
+eframe.workspace = true
+egui.workspace = true
+env_logger = "0.11"

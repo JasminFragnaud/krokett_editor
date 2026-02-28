@@ -1,0 +1,24 @@
+name: Github Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-github-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Trunk
+        run: cargo install trunk@0.20.3 --locked
+      - name: Build
+        run: env -C krokett_editor_web trunk build --release --public-url .
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: krokett_editor_web/dist
+          single-commit: true
