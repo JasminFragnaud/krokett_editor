@@ -25,6 +25,11 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui, ctx: &egui::Context) {
                 if ui.checkbox(&mut auto_fit, "Auto-fit GPX on load").changed() {
                     app.set_gpx_auto_fit_enabled(auto_fit);
                 }
+
+                let mut show_tree = app.gpx_tree_window_visible();
+                if ui.checkbox(&mut show_tree, "Show GPX tree").changed() {
+                    app.set_gpx_tree_window_visible(show_tree);
+                }
             });
         });
     });
@@ -32,7 +37,7 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui, ctx: &egui::Context) {
 
 pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
     Window::new("Map Selector")
-        .collapsible(false)
+        .collapsible(true)
         .resizable(false)
         .title_bar(false)
         .anchor(Align2::LEFT_TOP, [10., 44.])

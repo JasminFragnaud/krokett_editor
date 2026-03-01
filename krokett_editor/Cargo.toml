@@ -11,6 +11,7 @@ egui.workspace = true
 egui_extras.workspace = true
 log.workspace = true
 egui_material_icons = "0.5.0"
+egui_ltreeview = "0.6.1"
 itertools = "0.14.0"
 gpx = "0.10"
 

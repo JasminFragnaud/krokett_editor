@@ -86,6 +86,14 @@ impl MyApp {
     pub(crate) fn set_gpx_cut_tool_enabled(&mut self, enabled: bool) {
         self.gpx.set_cut_tool_enabled(enabled);
     }
+
+    pub(crate) fn gpx_tree_window_visible(&self) -> bool {
+        self.gpx.tree_window_visible()
+    }
+
+    pub(crate) fn set_gpx_tree_window_visible(&mut self, visible: bool) {
+        self.gpx.set_tree_window_visible(visible);
+    }
 }
 
 impl eframe::App for MyApp {
@@ -95,6 +103,8 @@ impl eframe::App for MyApp {
         TopBottomPanel::top("main_menu").show(ctx, |ui| {
             windows::top_menu(self, ui, ctx);
         });
+
+        self.gpx.show_tree_window(ctx);
 
         CentralPanel::default().frame(Frame::NONE).show(ctx, |ui| {
             self.gpx

@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use egui::{Color32, PointerButton, Pos2};
+use egui_ltreeview::{NodeBuilder, TreeView};
 use itertools::Itertools as _;
 use walkers::{Map, MapMemory, Plugin};
 
@@ -12,6 +14,7 @@ struct GpxSegment {
     waypoints: Vec<gpx::Waypoint>,
     positions: Vec<walkers::Position>,
     description: String,
+    visible: bool,
 }
 
 #[derive(Clone)]
@@ -26,6 +29,7 @@ struct GpxTrack {
     number: Option<u32>,
     original_kind: GpxTrackKind,
     segments: Vec<GpxSegment>,
+    visible: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -89,6 +93,13 @@ type AddPluginsOutput<'a, 'b, 'c> = (
     PendingMergeRequest,
 );
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum GpxTreeNodeId {
+    File(String),
+    Track(usize),
+    Segment(usize, usize),
+}
+
 pub(crate) struct GpxState {
     tracks: Vec<GpxTrack>,
     status: Option<String>,
@@ -101,6 +112,9 @@ pub(crate) struct GpxState {
     segment_editor_open: bool,
     selected_segment: Option<SegmentSelection>,
     window_highlight_segment: Option<SegmentSelection>,
+    tree_window_visible: bool,
+    tree_hover_track: Option<usize>,
+    tree_hover_segment: Option<SegmentSelection>,
     cut_tool_enabled: bool,
 }
 
@@ -118,6 +132,9 @@ impl GpxState {
             segment_editor_open: false,
             selected_segment: None,
             window_highlight_segment: None,
+            tree_window_visible: true,
+            tree_hover_track: None,
+            tree_hover_segment: None,
             cut_tool_enabled: false,
         }
     }
@@ -139,6 +156,8 @@ impl GpxState {
         self.segment_editor_open = false;
         self.selected_segment = None;
         self.window_highlight_segment = None;
+        self.tree_hover_track = None;
+        self.tree_hover_segment = None;
     }
 
     pub(crate) fn show_toast(&mut self, ctx: &egui::Context) {
@@ -181,6 +200,276 @@ impl GpxState {
 
     pub(crate) fn set_cut_tool_enabled(&mut self, enabled: bool) {
         self.cut_tool_enabled = enabled;
+    }
+
+    pub(crate) fn tree_window_visible(&self) -> bool {
+        self.tree_window_visible
+    }
+
+    pub(crate) fn set_tree_window_visible(&mut self, visible: bool) {
+        self.tree_window_visible = visible;
+        if !visible {
+            self.tree_hover_track = None;
+            self.tree_hover_segment = None;
+        }
+    }
+
+    pub(crate) fn show_tree_window(&mut self, ctx: &egui::Context) {
+        self.tree_hover_track = None;
+        self.tree_hover_segment = None;
+
+        if !self.tree_window_visible {
+            return;
+        }
+
+        let mut open = self.tree_window_visible;
+        let default_pos = ctx.available_rect().left_top() + egui::vec2(10., 200.0);
+        egui::Window::new("GPX Tree")
+            .open(&mut open)
+            .resizable(true)
+            .default_pos(default_pos)
+            .show(ctx, |ui| {
+                if self.tracks.is_empty() {
+                    ui.label("No GPX loaded");
+                    return;
+                }
+
+                let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+                for (track_index, track) in self.tracks.iter().enumerate() {
+                    groups
+                        .entry(track.source.clone())
+                        .or_default()
+                        .push(track_index);
+                }
+
+                let mut hover_track = None;
+                let mut hover_segment = None;
+                let mut click_track = None;
+                let mut click_segment = None;
+
+                let mut file_visibility_updates: Vec<(Vec<usize>, bool)> = Vec::new();
+                let mut track_visibility_updates: Vec<(usize, bool)> = Vec::new();
+                let mut segment_visibility_updates: Vec<((usize, usize), bool)> = Vec::new();
+
+                let tree_id = ui.make_persistent_id("gpx_tree_view");
+                let (_response, _actions) = TreeView::new(tree_id).show(ui, |builder| {
+                    for (source, track_indices) in &groups {
+                        let mut file_visible = true;
+                        for &track_index in track_indices {
+                            let track = &self.tracks[track_index];
+                            if !track.visible
+                                || track.segments.iter().any(|segment| !segment.visible)
+                            {
+                                file_visible = false;
+                                break;
+                            }
+                        }
+
+                        let file_label = format!("File: {source}");
+                        let file_is_open = builder.node(
+                            NodeBuilder::dir(GpxTreeNodeId::File(source.clone())).label_ui(|ui| {
+                                let row = ui.horizontal(|ui| {
+                                    let checkbox_response = ui.checkbox(&mut file_visible, "");
+                                    if checkbox_response.changed() {
+                                        file_visibility_updates
+                                            .push((track_indices.clone(), file_visible));
+                                    }
+                                    let label_response = ui.label(&file_label);
+                                    checkbox_response.hovered() || label_response.hovered()
+                                });
+
+                                let mut full_line_rect = row.response.rect;
+                                full_line_rect.set_left(ui.min_rect().left());
+                                full_line_rect.set_right(ui.max_rect().right());
+                                let row_hovered = row
+                                    .response
+                                    .ctx
+                                    .pointer_hover_pos()
+                                    .map(|pointer| full_line_rect.contains(pointer))
+                                    .unwrap_or(false);
+
+                                if row.inner || row_hovered {
+                                    for &track_index in track_indices {
+                                        hover_track = Some(track_index);
+                                    }
+                                }
+                            }),
+                        );
+
+                        if file_is_open {
+                            for &track_index in track_indices {
+                                let track = &self.tracks[track_index];
+                                let mut track_visible = track.visible;
+                                let track_title = if track.name.trim().is_empty() {
+                                    format!("Track {}", track_index + 1)
+                                } else {
+                                    track.name.clone()
+                                };
+
+                                let track_is_open = builder.node(
+                                    NodeBuilder::dir(GpxTreeNodeId::Track(track_index)).label_ui(
+                                        |ui| {
+                                            let row = ui.horizontal(|ui| {
+                                                let checkbox_response =
+                                                    ui.checkbox(&mut track_visible, "");
+                                                if checkbox_response.changed() {
+                                                    track_visibility_updates
+                                                        .push((track_index, track_visible));
+                                                }
+                                                let label_response = ui.label(&track_title);
+                                                (
+                                                    checkbox_response.hovered()
+                                                        || label_response.hovered(),
+                                                    checkbox_response.clicked()
+                                                        || label_response.clicked(),
+                                                )
+                                            });
+                                            let mut full_line_rect = row.response.rect;
+                                            full_line_rect.set_left(ui.min_rect().left());
+                                            full_line_rect.set_right(ui.max_rect().right());
+                                            let row_hovered = row
+                                                .response
+                                                .ctx
+                                                .pointer_hover_pos()
+                                                .map(|pointer| full_line_rect.contains(pointer))
+                                                .unwrap_or(false);
+                                            let row_clicked = row.response.ctx.input(|input| {
+                                                input.pointer.primary_clicked()
+                                                    && input.pointer.interact_pos().is_some_and(
+                                                        |pointer| full_line_rect.contains(pointer),
+                                                    )
+                                            });
+
+                                            if row.inner.0 || row_hovered {
+                                                hover_track = Some(track_index);
+                                            }
+                                            if row.inner.1 || row_clicked {
+                                                click_track = Some(track_index);
+                                            }
+                                        },
+                                    ),
+                                );
+
+                                if track_is_open {
+                                    for (segment_index, segment) in
+                                        track.segments.iter().enumerate()
+                                    {
+                                        let mut segment_visible = segment.visible;
+                                        let segment_label = format!(
+                                            "{}: {}",
+                                            segment_index + 1,
+                                            segment.description
+                                        );
+
+                                        builder.node(
+                                            NodeBuilder::leaf(GpxTreeNodeId::Segment(
+                                                track_index,
+                                                segment_index,
+                                            ))
+                                            .label_ui(|ui| {
+                                                let row = ui.horizontal(|ui| {
+                                                    let checkbox_response =
+                                                        ui.checkbox(&mut segment_visible, "");
+                                                    if checkbox_response.changed() {
+                                                        segment_visibility_updates.push((
+                                                            (track_index, segment_index),
+                                                            segment_visible,
+                                                        ));
+                                                    }
+                                                    let label_response = ui.label(&segment_label);
+                                                    (
+                                                        checkbox_response.hovered()
+                                                            || label_response.hovered(),
+                                                        checkbox_response.clicked()
+                                                            || label_response.clicked(),
+                                                    )
+                                                });
+                                                let mut full_line_rect = row.response.rect;
+                                                full_line_rect.set_left(ui.min_rect().left());
+                                                full_line_rect.set_right(ui.max_rect().right());
+                                                let row_hovered = row
+                                                    .response
+                                                    .ctx
+                                                    .pointer_hover_pos()
+                                                    .map(|pointer| full_line_rect.contains(pointer))
+                                                    .unwrap_or(false);
+                                                let row_clicked = row.response.ctx.input(|input| {
+                                                    input.pointer.primary_clicked()
+                                                        && input.pointer.interact_pos().is_some_and(
+                                                            |pointer| {
+                                                                full_line_rect.contains(pointer)
+                                                            },
+                                                        )
+                                                });
+
+                                                if row.inner.0 || row_hovered {
+                                                    hover_segment =
+                                                        Some((track_index, segment_index));
+                                                }
+                                                if row.inner.1 || row_clicked {
+                                                    click_segment =
+                                                        Some((track_index, segment_index));
+                                                }
+                                            }),
+                                        );
+                                    }
+                                }
+
+                                builder.close_dir();
+                            }
+                        }
+
+                        builder.close_dir();
+                    }
+                });
+
+                for (track_indices, visible) in file_visibility_updates {
+                    for track_index in track_indices {
+                        if let Some(track) = self.tracks.get_mut(track_index) {
+                            track.visible = visible;
+                            for segment in &mut track.segments {
+                                segment.visible = visible;
+                            }
+                        }
+                    }
+                }
+
+                for (track_index, visible) in track_visibility_updates {
+                    if let Some(track) = self.tracks.get_mut(track_index) {
+                        track.visible = visible;
+                        for segment in &mut track.segments {
+                            segment.visible = visible;
+                        }
+                    }
+                }
+
+                for ((track_index, segment_index), visible) in segment_visibility_updates {
+                    if let Some(track) = self.tracks.get_mut(track_index) {
+                        if let Some(segment) = track.segments.get_mut(segment_index) {
+                            segment.visible = visible;
+                        }
+                    }
+                }
+
+                if let Some(track_index) = click_track {
+                    self.selected_track_index = Some(track_index);
+                    self.metadata_editor_open = true;
+                }
+
+                if let Some((track_index, segment_index)) = click_segment {
+                    self.selected_segment = Some((track_index, segment_index));
+                    self.segment_editor_open = true;
+                }
+
+                self.tree_hover_track = hover_track;
+                self.tree_hover_segment = hover_segment;
+            });
+
+        self.tree_window_visible = open;
+        if !self.tree_window_visible {
+            self.tree_hover_track = None;
+            self.tree_hover_segment = None;
+        }
     }
 
     pub(crate) fn show_metadata_editor_window(&mut self, ctx: &egui::Context) {
@@ -273,7 +562,15 @@ impl GpxState {
                 ui.text_edit_multiline(&mut segment.description);
             });
 
-        self.window_highlight_segment = if response.as_ref().is_some_and(|r| r.response.hovered()) {
+        let window_hovered = response
+            .as_ref()
+            .and_then(|r| {
+                ctx.pointer_hover_pos()
+                    .map(|pointer| r.response.rect.contains(pointer))
+            })
+            .unwrap_or(false);
+
+        self.window_highlight_segment = if window_hovered {
             Some((track_index, segment_index))
         } else {
             None
@@ -359,6 +656,7 @@ impl GpxState {
             waypoints: segment_waypoints,
             positions: segment_positions,
             description: segment_description,
+            visible: true,
         })
     }
 
@@ -402,6 +700,7 @@ impl GpxState {
                     number: track.number,
                     original_kind: GpxTrackKind::Track,
                     segments,
+                    visible: true,
                 });
             }
         }
@@ -424,6 +723,7 @@ impl GpxState {
                     number: route.number,
                     original_kind: GpxTrackKind::Route,
                     segments: vec![imported_segment],
+                    visible: true,
                 });
             }
         }
@@ -712,8 +1012,16 @@ impl GpxState {
         let remove_request = Arc::new(Mutex::new(None));
 
         for (track_index, track) in self.tracks.iter().enumerate() {
+            if !track.visible {
+                continue;
+            }
+
             let segment_count = track.segments.len();
             for (segment_index, segment) in track.segments.iter().enumerate() {
+                if !segment.visible {
+                    continue;
+                }
+
                 map = map.with_plugin(GpxPolyline {
                     positions: segment.positions.clone(),
                     description: segment.description.clone(),
@@ -724,7 +1032,9 @@ impl GpxState {
                     window_highlighted: self
                         .window_highlight_segment
                         .map(|selected| selected == (track_index, segment_index))
-                        .unwrap_or(false),
+                        .unwrap_or(false)
+                        || self.tree_hover_track == Some(track_index)
+                        || self.tree_hover_segment == Some((track_index, segment_index)),
                     cut_tool_enabled: self.cut_tool_enabled,
                     clicked_track: clicked_track.clone(),
                     clicked_segment: clicked_segment.clone(),
@@ -802,6 +1112,7 @@ impl GpxState {
                 waypoints: first_waypoints,
                 positions: first_positions,
                 description: original_description,
+                visible: true,
             },
         );
         self.tracks[track_index].segments.insert(
@@ -810,6 +1121,7 @@ impl GpxState {
                 waypoints: second_waypoints,
                 positions: second_positions,
                 description: String::new(),
+                visible: true,
             },
         );
 
@@ -872,6 +1184,7 @@ impl GpxState {
             waypoints: merged_waypoints,
             positions: merged_positions,
             description: merged_description,
+            visible: true,
         };
         self.tracks[track_index].segments.remove(right_idx);
 

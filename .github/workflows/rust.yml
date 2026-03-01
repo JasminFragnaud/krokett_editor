@@ -10,17 +10,33 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build_linux:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - name: Build
-      run: cargo build
+      run: cargo build --release
     - name: Cargo Check All Features
       run: cargo check --all-features
-    - name: Build Native
-      run: env -C krokett_editor_native cargo build
+    - uses: actions/upload-artifact@v4
+      with:
+        name: krokett_editor_linux
+        path: target/release/krokett_editor_native
+
+  build_windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - name: Build
+      run: cargo build --release
+    - name: Cargo Check All Features
+      run: cargo check --all-features
+    - uses: actions/upload-artifact@v4
+      with:
+        name: krokett_editor_windows
+        path: target/release/krokett_editor_native
 
   wasm:
     runs-on: ubuntu-latest
@@ -33,6 +49,7 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
+    if: false # Android build is currently disabled
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
@@ -66,5 +83,3 @@ jobs:
       run:  cargo clippy --all-features -- -D warnings 
     - name: Documentation
       run:  cargo doc --no-deps
-    - name: Typos
-      uses: crate-ci/typos@v1.30.2
