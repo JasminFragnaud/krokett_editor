@@ -16,8 +16,8 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui, ctx: &egui::Context) {
                     ui.close();
                 }
 
-                if app.gpx_tracks_count() > 0 && ui.button("Clear GPX overlays").clicked() {
-                    app.clear_gpx_tracks();
+                if app.gpx_tracks_count() > 0 && ui.button("Remove GPXs").clicked() {
+                    app.request_clear_gpx_tracks();
                     ui.close();
                 }
 
@@ -68,6 +68,38 @@ pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
                 ui.label(status);
             }
         });
+}
+
+pub fn clear_gpx_confirmation_modal(app: &mut MyApp, ctx: &egui::Context) {
+    if !app.clear_gpx_confirm_open() {
+        return;
+    }
+
+    let mut confirm = false;
+
+    let modal_response =
+        egui::Modal::new(egui::Id::new("clear_gpx_confirmation")).show(ctx, |ui| {
+            ui.set_min_width(320.0);
+            ui.heading("Clear all GPX overlays?");
+            ui.add_space(4.0);
+            ui.label("This action removes all loaded GPX tracks from the map.");
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                if ui.button("Ok").clicked() {
+                    confirm = true;
+                    ui.close();
+                }
+                if ui.button("Cancel").clicked() {
+                    ui.close();
+                }
+            });
+        });
+
+    if confirm {
+        app.confirm_clear_gpx_tracks();
+    } else if modal_response.should_close() {
+        app.cancel_clear_gpx_tracks();
+    }
 }
 
 pub fn large_material_button(ui: &mut Ui, text: &str) -> Response {

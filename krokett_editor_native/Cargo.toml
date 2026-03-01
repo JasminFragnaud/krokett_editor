@@ -10,3 +10,8 @@ krokett_editor = { path = "../krokett_editor" }
 eframe.workspace = true
 egui.workspace = true
 env_logger = "0.11"
+
+[package.metadata.appimage]
+assets = ["images"]
+icon = "assets/icon.png"
+auto_link = true

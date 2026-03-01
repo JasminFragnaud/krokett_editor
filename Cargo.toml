@@ -12,4 +12,3 @@ egui = "0.33.3"
 egui_extras = { version = "0.33.3", features = ["svg"] }
 eframe = "0.33.3"
 egui-winit = "0.33.3"
-

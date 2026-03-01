@@ -15,6 +15,7 @@ pub struct MyApp {
     selected_provider: Provider,
     map_memory: MapMemory,
     gpx: gpx::GpxState,
+    clear_gpx_confirm_open: bool,
 }
 
 impl MyApp {
@@ -27,6 +28,7 @@ impl MyApp {
             selected_provider: Provider::IgnRandonnee25k,
             map_memory: MapMemory::default(),
             gpx: gpx::GpxState::new(),
+            clear_gpx_confirm_open: false,
         }
     }
 
@@ -40,6 +42,25 @@ impl MyApp {
 
     pub(crate) fn clear_gpx_tracks(&mut self) {
         self.gpx.clear();
+    }
+
+    pub(crate) fn request_clear_gpx_tracks(&mut self) {
+        if self.gpx_tracks_count() > 0 {
+            self.clear_gpx_confirm_open = true;
+        }
+    }
+
+    pub(crate) fn confirm_clear_gpx_tracks(&mut self) {
+        self.clear_gpx_tracks();
+        self.clear_gpx_confirm_open = false;
+    }
+
+    pub(crate) fn cancel_clear_gpx_tracks(&mut self) {
+        self.clear_gpx_confirm_open = false;
+    }
+
+    pub(crate) fn clear_gpx_confirm_open(&self) -> bool {
+        self.clear_gpx_confirm_open
     }
 
     pub(crate) fn gpx_auto_fit_enabled(&self) -> bool {
@@ -115,6 +136,7 @@ impl eframe::App for MyApp {
 
         self.gpx.show_metadata_editor_window(ctx);
         self.gpx.show_segment_editor_window(ctx);
+        windows::clear_gpx_confirmation_modal(self, ctx);
         self.gpx.show_toast(ctx);
     }
 }

@@ -3,12 +3,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use egui::{Color32, FontId, PointerButton, Pos2};
+use egui::{Color32, PointerButton, Pos2};
 use itertools::Itertools as _;
 use walkers::{Map, MapMemory, Plugin};
 
 #[derive(Clone)]
 struct GpxSegment {
+    waypoints: Vec<gpx::Waypoint>,
     positions: Vec<walkers::Position>,
     description: String,
 }
@@ -18,7 +19,19 @@ struct GpxTrack {
     source: String,
     name: String,
     description: String,
+    comment: Option<String>,
+    data_source: Option<String>,
+    links: Vec<gpx::Link>,
+    type_: Option<String>,
+    number: Option<u32>,
+    original_kind: GpxTrackKind,
     segments: Vec<GpxSegment>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GpxTrackKind {
+    Track,
+    Route,
 }
 
 #[derive(Clone, Copy)]
@@ -315,10 +328,18 @@ impl GpxState {
     }
 
     fn import_segment(
-        segment_positions: Vec<walkers::Position>,
+        segment_waypoints: Vec<gpx::Waypoint>,
         segment_description: String,
         bounds: &mut Option<GpxBounds>,
     ) -> Option<GpxSegment> {
+        let segment_positions: Vec<_> = segment_waypoints
+            .iter()
+            .map(|waypoint| {
+                let point = waypoint.point();
+                walkers::lat_lon(point.y(), point.x())
+            })
+            .collect();
+
         if segment_positions.len() <= 1 {
             return None;
         }
@@ -335,6 +356,7 @@ impl GpxState {
         }
 
         Some(GpxSegment {
+            waypoints: segment_waypoints,
             positions: segment_positions,
             description: segment_description,
         })
@@ -360,20 +382,9 @@ impl GpxState {
                     .and_then(|waypoint| waypoint.description.clone())
                     .unwrap_or_default();
 
-                let segment_positions: Vec<_> = segment
-                    .points
-                    .into_iter()
-                    .map(|waypoint| {
-                        let point = waypoint.point();
-                        walkers::lat_lon(point.y(), point.x())
-                    })
-                    .collect();
-
-                if let Some(imported_segment) = Self::import_segment(
-                    segment_positions,
-                    segment_description,
-                    &mut imported_bounds,
-                ) {
+                if let Some(imported_segment) =
+                    Self::import_segment(segment.points, segment_description, &mut imported_bounds)
+                {
                     segments.push(imported_segment);
                     imported_segments += 1;
                 }
@@ -384,23 +395,20 @@ impl GpxState {
                     source: file_name.to_owned(),
                     name: track.name.clone().unwrap_or_else(|| file_name.to_owned()),
                     description: track.description.clone().unwrap_or_default(),
+                    comment: track.comment.clone(),
+                    data_source: track.source.clone(),
+                    links: track.links.clone(),
+                    type_: track.type_.clone(),
+                    number: track.number,
+                    original_kind: GpxTrackKind::Track,
                     segments,
                 });
             }
         }
 
         for route in gpx.routes {
-            let segment_positions: Vec<_> = route
-                .points
-                .into_iter()
-                .map(|waypoint| {
-                    let point = waypoint.point();
-                    walkers::lat_lon(point.y(), point.x())
-                })
-                .collect();
-
             if let Some(imported_segment) = Self::import_segment(
-                segment_positions,
+                route.points,
                 route.description.clone().unwrap_or_default(),
                 &mut imported_bounds,
             ) {
@@ -409,6 +417,12 @@ impl GpxState {
                     source: file_name.to_owned(),
                     name: route.name.clone().unwrap_or_else(|| file_name.to_owned()),
                     description: String::new(),
+                    comment: route.comment.clone(),
+                    data_source: route.source.clone(),
+                    links: route.links.clone(),
+                    type_: route.type_.clone(),
+                    number: route.number,
+                    original_kind: GpxTrackKind::Route,
                     segments: vec![imported_segment],
                 });
             }
@@ -453,6 +467,32 @@ impl GpxState {
         };
 
         for track in &self.tracks {
+            if track.original_kind == GpxTrackKind::Route && track.segments.len() == 1 {
+                let segment = &track.segments[0];
+                let mut exported_route = gpx::Route::new();
+                if !track.name.trim().is_empty() {
+                    exported_route.name = Some(track.name.clone());
+                }
+                exported_route.description = if segment.description.trim().is_empty() {
+                    None
+                } else {
+                    Some(segment.description.clone())
+                };
+                exported_route.comment = track.comment.clone();
+                exported_route.source = track.data_source.clone();
+                exported_route.links = track.links.clone();
+                exported_route.type_ = track.type_.clone();
+                exported_route.number = track.number;
+
+                exported_route.points = segment.waypoints.clone();
+                if let Some(first_waypoint) = exported_route.points.first_mut() {
+                    first_waypoint.description = exported_route.description.clone();
+                }
+
+                gpx_file.routes.push(exported_route);
+                continue;
+            }
+
             let mut exported_track = gpx::Track::new();
             if !track.name.trim().is_empty() {
                 exported_track.name = Some(track.name.clone());
@@ -460,15 +500,21 @@ impl GpxState {
             if !track.description.trim().is_empty() {
                 exported_track.description = Some(track.description.clone());
             }
+            exported_track.comment = track.comment.clone();
+            exported_track.source = track.data_source.clone();
+            exported_track.links = track.links.clone();
+            exported_track.type_ = track.type_.clone();
+            exported_track.number = track.number;
 
             for segment in &track.segments {
                 let mut exported_segment = gpx::TrackSegment::new();
-                for (idx, position) in segment.positions.iter().enumerate() {
-                    let mut waypoint = gpx::Waypoint::new(*position);
-                    if idx == 0 && !segment.description.trim().is_empty() {
-                        waypoint.description = Some(segment.description.clone());
-                    }
-                    exported_segment.points.push(waypoint);
+                exported_segment.points = segment.waypoints.clone();
+                if let Some(first_waypoint) = exported_segment.points.first_mut() {
+                    first_waypoint.description = if segment.description.trim().is_empty() {
+                        None
+                    } else {
+                        Some(segment.description.clone())
+                    };
                 }
                 exported_track.segments.push(exported_segment);
             }
@@ -738,6 +784,8 @@ impl GpxState {
             return;
         }
 
+        let first_waypoints = segment.waypoints[..=split_idx].to_vec();
+        let second_waypoints = segment.waypoints[split_idx..].to_vec();
         let first_positions = segment.positions[..=split_idx].to_vec();
         let second_positions = segment.positions[split_idx..].to_vec();
 
@@ -751,6 +799,7 @@ impl GpxState {
         self.tracks[track_index].segments.insert(
             segment_index,
             GpxSegment {
+                waypoints: first_waypoints,
                 positions: first_positions,
                 description: original_description,
             },
@@ -758,6 +807,7 @@ impl GpxState {
         self.tracks[track_index].segments.insert(
             segment_index + 1,
             GpxSegment {
+                waypoints: second_waypoints,
                 positions: second_positions,
                 description: String::new(),
             },
@@ -799,11 +849,17 @@ impl GpxState {
         let left_segment = self.tracks[track_index].segments[left_idx].clone();
         let right_segment = self.tracks[track_index].segments[right_idx].clone();
 
+        let mut merged_waypoints = left_segment.waypoints.clone();
         let mut merged_positions = left_segment.positions.clone();
+        let mut right_waypoints = right_segment.waypoints;
         let mut right_positions = right_segment.positions;
         if merged_positions.last() == right_positions.first() {
+            if !right_waypoints.is_empty() {
+                right_waypoints.remove(0);
+            }
             right_positions.remove(0);
         }
+        merged_waypoints.extend(right_waypoints);
         merged_positions.extend(right_positions);
 
         let merged_description = if !left_segment.description.trim().is_empty() {
@@ -813,6 +869,7 @@ impl GpxState {
         };
 
         self.tracks[track_index].segments[left_idx] = GpxSegment {
+            waypoints: merged_waypoints,
             positions: merged_positions,
             description: merged_description,
         };
@@ -982,9 +1039,14 @@ impl Plugin for GpxPolyline {
         }
 
         let stroke = if hovered || self.window_highlighted {
-            egui::Stroke::new(6.0, Color32::from_rgb(65, 130, 210))
+            // segment hover
+            egui::Stroke::new(5.0, Color32::from_rgb(14, 214, 85))
+        } else if !self.description.trim().is_empty() {
+            // segment with description
+            egui::Stroke::new(4.0, Color32::from_rgb(65, 130, 210))
         } else {
-            egui::Stroke::new(4.0, Color32::from_rgb(30, 90, 160))
+            // segment not hover no description
+            egui::Stroke::new(4.0, Color32::from_rgb(255, 111, 0))
         };
 
         for (from, to) in self.positions.iter().tuple_windows() {
@@ -994,19 +1056,6 @@ impl Plugin for GpxPolyline {
                 vec![from_projected, to_projected],
                 stroke,
             ));
-        }
-
-        if !self.positions.is_empty() {
-            let middle_idx = self.positions.len() / 2;
-            let middle_pos = self.positions[middle_idx];
-            let middle_projected = projector.project(middle_pos).to_pos2();
-            ui.painter().text(
-                middle_projected + egui::vec2(6.0, -6.0),
-                egui::Align2::LEFT_BOTTOM,
-                format!("{}", self.segment_index + 1),
-                FontId::proportional(12.0),
-                Color32::BLACK,
-            );
         }
 
         if let Some(first) = self.positions.first() {
