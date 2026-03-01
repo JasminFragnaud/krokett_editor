@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::io::Cursor;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -39,7 +38,7 @@ enum GpxTrackKind {
 }
 
 #[derive(Clone, Copy)]
-struct GpxBounds {
+pub struct GpxBounds {
     min_lat: f64,
     max_lat: f64,
     min_lon: f64,
@@ -660,7 +659,7 @@ impl GpxState {
         })
     }
 
-    fn load_gpx_from_bytes(
+    pub fn load_gpx_from_bytes(
         &mut self,
         file_name: &str,
         bytes: &[u8],
@@ -735,114 +734,6 @@ impl GpxState {
         Ok((imported_segments, imported_bounds))
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn load_from_disk_dialog(
-        &mut self,
-        ctx: &egui::Context,
-        map_memory: &mut MapMemory,
-    ) {
-        let Some(paths) = rfd::FileDialog::new()
-            .add_filter("GPX", &["gpx"])
-            .pick_files()
-        else {
-            return;
-        };
-
-        self.load_from_paths(paths, ctx, map_memory);
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn save_to_disk_dialog(&mut self) {
-        let Some(path) = rfd::FileDialog::new()
-            .set_file_name("tracks.gpx")
-            .save_file()
-        else {
-            return;
-        };
-
-        let mut gpx_file = gpx::Gpx {
-            version: gpx::GpxVersion::Gpx11,
-            creator: Some("krokett_editor".to_owned()),
-            ..Default::default()
-        };
-
-        for track in &self.tracks {
-            if track.original_kind == GpxTrackKind::Route && track.segments.len() == 1 {
-                let segment = &track.segments[0];
-                let mut exported_route = gpx::Route::new();
-                if !track.name.trim().is_empty() {
-                    exported_route.name = Some(track.name.clone());
-                }
-                exported_route.description = if segment.description.trim().is_empty() {
-                    None
-                } else {
-                    Some(segment.description.clone())
-                };
-                exported_route.comment = track.comment.clone();
-                exported_route.source = track.data_source.clone();
-                exported_route.links = track.links.clone();
-                exported_route.type_ = track.type_.clone();
-                exported_route.number = track.number;
-
-                exported_route.points = segment.waypoints.clone();
-                if let Some(first_waypoint) = exported_route.points.first_mut() {
-                    first_waypoint.description = exported_route.description.clone();
-                }
-
-                gpx_file.routes.push(exported_route);
-                continue;
-            }
-
-            let mut exported_track = gpx::Track::new();
-            if !track.name.trim().is_empty() {
-                exported_track.name = Some(track.name.clone());
-            }
-            if !track.description.trim().is_empty() {
-                exported_track.description = Some(track.description.clone());
-            }
-            exported_track.comment = track.comment.clone();
-            exported_track.source = track.data_source.clone();
-            exported_track.links = track.links.clone();
-            exported_track.type_ = track.type_.clone();
-            exported_track.number = track.number;
-
-            for segment in &track.segments {
-                let mut exported_segment = gpx::TrackSegment::new();
-                exported_segment.points = segment.waypoints.clone();
-                if let Some(first_waypoint) = exported_segment.points.first_mut() {
-                    first_waypoint.description = if segment.description.trim().is_empty() {
-                        None
-                    } else {
-                        Some(segment.description.clone())
-                    };
-                }
-                exported_track.segments.push(exported_segment);
-            }
-
-            gpx_file.tracks.push(exported_track);
-        }
-
-        match std::fs::File::create(&path) {
-            Ok(file) => {
-                let writer = std::io::BufWriter::new(file);
-                match gpx::write(&gpx_file, writer) {
-                    Ok(()) => {
-                        let message = format!("Saved {} track(s)", self.tracks.len());
-                        self.status = Some(message.clone());
-                        self.toast_message = Some(message);
-                        self.toast_until = Some(Instant::now() + Duration::from_secs(5));
-                    }
-                    Err(err) => {
-                        self.status = Some(format!("Could not save GPX: {err}"));
-                    }
-                }
-            }
-            Err(err) => {
-                self.status = Some(format!("Could not create {}: {err}", path.display()));
-            }
-        }
-    }
-
     #[cfg(target_arch = "wasm32")]
     pub(crate) fn load_from_disk_dialog(
         &mut self,
@@ -856,44 +747,6 @@ impl GpxState {
     #[cfg(target_arch = "wasm32")]
     pub(crate) fn save_to_disk_dialog(&mut self) {
         self.status = Some("Save dialog is unavailable on this target".to_owned());
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn load_from_paths(
-        &mut self,
-        paths: Vec<PathBuf>,
-        ctx: &egui::Context,
-        map_memory: &mut MapMemory,
-    ) {
-        let mut imported_segments = 0;
-        let mut errors = Vec::new();
-        let mut imported_bounds: Option<GpxBounds> = None;
-
-        for path in paths {
-            let file_name = path
-                .file_name()
-                .map(|name| name.to_string_lossy().to_string())
-                .unwrap_or_else(|| path.display().to_string());
-
-            match std::fs::read(&path) {
-                Ok(bytes) => match self.load_gpx_from_bytes(&file_name, &bytes) {
-                    Ok((count, bounds)) => {
-                        imported_segments += count;
-                        if let Some(bounds) = bounds {
-                            if let Some(existing) = imported_bounds.as_mut() {
-                                existing.merge(bounds);
-                            } else {
-                                imported_bounds = Some(bounds);
-                            }
-                        }
-                    }
-                    Err(error) => errors.push(error),
-                },
-                Err(err) => errors.push(format!("Could not read {}: {err}", path.display())),
-            }
-        }
-
-        self.finalize_import(imported_segments, errors, imported_bounds, ctx, map_memory);
     }
 
     fn finalize_import(

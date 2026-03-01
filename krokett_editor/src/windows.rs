@@ -1,18 +1,27 @@
-use crate::MyApp;
+use crate::{
+    MyApp,
+    file_utils::{FileContent, load_file, save_as},
+};
 use egui::{Align, Align2, ComboBox, Image, Layout, Response, RichText, Ui, Window};
-use walkers::{sources::Attribution, MapMemory};
+use walkers::{MapMemory, sources::Attribution};
 
-pub fn top_menu(app: &mut MyApp, ui: &mut Ui, ctx: &egui::Context) {
+pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
     egui::MenuBar::new().ui(ui, |ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("Load GPX…").clicked() {
-                    app.load_gpx_from_disk(ctx);
+                    load_file(app.load_gpx_channel.0.clone());
                     ui.close();
                 }
 
                 if ui.button("Save GPX…").clicked() {
-                    app.save_gpx_to_disk();
+                    save_as(
+                        FileContent {
+                            name: "test.gpx".to_string(),
+                            data: Vec::new(),
+                        },
+                        app.save_gpx_channel.0.clone(),
+                    );
                     ui.close();
                 }
 

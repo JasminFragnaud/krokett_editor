@@ -1,13 +1,20 @@
+mod file_utils;
 mod gpx;
 mod places;
 mod style;
+mod task_utils;
 mod tiles;
 mod windows;
 
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::mpsc::{Receiver, Sender},
+};
 
+use crate::file_utils::{FileContent, FileName};
+use anyhow::Result;
 use egui::{CentralPanel, Context, Frame, TopBottomPanel};
-use tiles::{providers, Provider, TilesKind};
+use tiles::{Provider, TilesKind, providers};
 use walkers::{Map, MapMemory};
 
 pub struct MyApp {
@@ -16,6 +23,8 @@ pub struct MyApp {
     map_memory: MapMemory,
     gpx: gpx::GpxState,
     clear_gpx_confirm_open: bool,
+    load_gpx_channel: (Sender<FileContent>, Receiver<FileContent>),
+    save_gpx_channel: (Sender<Result<FileName>>, Receiver<Result<FileName>>),
 }
 
 impl MyApp {
@@ -28,6 +37,8 @@ impl MyApp {
             selected_provider: Provider::IgnRandonnee25k,
             map_memory: MapMemory::default(),
             gpx: gpx::GpxState::new(),
+            load_gpx_channel: (std::sync::mpsc::channel()),
+            save_gpx_channel: (std::sync::mpsc::channel()),
             clear_gpx_confirm_open: false,
         }
     }
@@ -71,12 +82,16 @@ impl MyApp {
         self.gpx.set_auto_fit_enabled(enabled);
     }
 
-    pub(crate) fn load_gpx_from_disk(&mut self, ctx: &egui::Context) {
-        self.gpx.load_from_disk_dialog(ctx, &mut self.map_memory);
-    }
-
-    pub(crate) fn save_gpx_to_disk(&mut self) {
-        self.gpx.save_to_disk_dialog();
+    pub(crate) fn load_gpx_from_disk(&mut self) {
+        if let Ok(file_content) = self.load_gpx_channel.1.try_recv() {
+            match self
+                .gpx
+                .load_gpx_from_bytes(&file_content.name, &file_content.data)
+            {
+                Ok(_) => log::info!("GPX file loaded successfully"),
+                Err(e) => log::error!("Error loading GPX file: {e}"),
+            }
+        }
     }
 
     pub(crate) fn gpx_cut_tool_enabled(&self) -> bool {
@@ -98,10 +113,12 @@ impl MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.load_gpx_from_disk();
+
         self.gpx.handle_dropped_files(ctx, &mut self.map_memory);
 
         TopBottomPanel::top("main_menu").show(ctx, |ui| {
-            windows::top_menu(self, ui, ctx);
+            windows::top_menu(self, ui);
         });
 
         self.gpx.show_tree_window(ctx);
