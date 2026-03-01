@@ -33,5 +33,5 @@ fn main() {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    println!("This demo is only meant to be compiled for WASM.");
+    println!("This can only be compiled for WASM. (might want to use trunk");
 }
