@@ -1,10 +1,9 @@
 name: Rust
 
-on: 
-  pull_request:
+on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*.*.*' # Trigger on version
 
 env:
   CARGO_TERM_COLOR: always
@@ -21,22 +20,23 @@ jobs:
       run: cargo check --all-features
     - uses: actions/upload-artifact@v4
       with:
-        name: krokett_editor_linux
+        name: krokett_editor_linux_${{ github.ref_name }}
         path: target/release/krokett_editor_native
 
   build_windows:
     runs-on: windows-latest
+    if: false # Windows build is currently disabled
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
-    - name: Build
+    - name: Builds
       run: cargo build --release
     - name: Cargo Check All Features
       run: cargo check --all-features
     - uses: actions/upload-artifact@v4
       with:
-        name: krokett_editor_windows
-        path: target/release/krokett_editor_native
+        name: krokett_editor_windows_${{ github.ref_name }}.exe
+        path: target\release\krokett_editor_native.exe
 
   wasm:
     runs-on: ubuntu-latest
