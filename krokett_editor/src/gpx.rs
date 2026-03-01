@@ -12,7 +12,7 @@ use walkers::{Map, MapMemory, Plugin};
 #[derive(Clone)]
 struct GpxSegment {
     waypoints: Vec<gpx::Waypoint>,
-    positions: Vec<walkers::Position>,
+    positions: Arc<Vec<walkers::Position>>,
     description: String,
     visible: bool,
 }
@@ -654,7 +654,7 @@ impl GpxState {
 
         Some(GpxSegment {
             waypoints: segment_waypoints,
-            positions: segment_positions,
+            positions: Arc::new(segment_positions),
             description: segment_description,
             visible: true,
         })
@@ -1110,7 +1110,7 @@ impl GpxState {
             segment_index,
             GpxSegment {
                 waypoints: first_waypoints,
-                positions: first_positions,
+                positions: Arc::new(first_positions),
                 description: original_description,
                 visible: true,
             },
@@ -1119,7 +1119,7 @@ impl GpxState {
             segment_index + 1,
             GpxSegment {
                 waypoints: second_waypoints,
-                positions: second_positions,
+                positions: Arc::new(second_positions),
                 description: String::new(),
                 visible: true,
             },
@@ -1162,9 +1162,9 @@ impl GpxState {
         let right_segment = self.tracks[track_index].segments[right_idx].clone();
 
         let mut merged_waypoints = left_segment.waypoints.clone();
-        let mut merged_positions = left_segment.positions.clone();
+        let mut merged_positions = (*left_segment.positions).clone();
         let mut right_waypoints = right_segment.waypoints;
-        let mut right_positions = right_segment.positions;
+        let mut right_positions = (*right_segment.positions).clone();
         if merged_positions.last() == right_positions.first() {
             if !right_waypoints.is_empty() {
                 right_waypoints.remove(0);
@@ -1182,7 +1182,7 @@ impl GpxState {
 
         self.tracks[track_index].segments[left_idx] = GpxSegment {
             waypoints: merged_waypoints,
-            positions: merged_positions,
+            positions: Arc::new(merged_positions),
             description: merged_description,
             visible: true,
         };
@@ -1197,7 +1197,7 @@ impl GpxState {
 }
 
 struct GpxPolyline {
-    positions: Vec<walkers::Position>,
+    positions: Arc<Vec<walkers::Position>>,
     description: String,
     track_index: usize,
     segment_index: usize,
