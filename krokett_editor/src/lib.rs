@@ -45,8 +45,12 @@ impl MyApp {
 
     pub(crate) fn load_gpx_from_disk(&mut self, ctx: &egui::Context) {
         while let Ok(file_content) = self.load_gpx_channel.1.try_recv() {
-            self.gpx_state
-                .load_gpx_file(&file_content.name, &file_content.data, ctx, &mut self.map_memory);
+            self.gpx_state.load_gpx_file(
+                &file_content.name,
+                &file_content.data,
+                ctx,
+                &mut self.map_memory,
+            );
         }
     }
 

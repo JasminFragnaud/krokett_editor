@@ -3,8 +3,8 @@ use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 
 use egui::{Color32, PointerButton, Pos2};
-use egui_notify::{Anchor, Toasts};
 use egui_ltreeview::{NodeBuilder, TreeView};
+use egui_notify::{Anchor, Toasts};
 use itertools::Itertools as _;
 use walkers::{Map, MapMemory, Plugin};
 
@@ -670,7 +670,10 @@ impl GpxState {
                                                         && input.pointer.interact_pos().is_some_and(
                                                             |pointer| {
                                                                 full_line_rect.contains(pointer)
-                                                                    && !row.inner.2.contains(pointer)
+                                                                    && !row
+                                                                        .inner
+                                                                        .2
+                                                                        .contains(pointer)
                                                             },
                                                         )
                                                 });
