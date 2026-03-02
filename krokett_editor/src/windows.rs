@@ -1,5 +1,5 @@
 use crate::{MyApp, file_utils::load_file, toggle_switch};
-use egui::{Align, Align2, ComboBox, Image, Layout, Response, RichText, Ui, Window};
+use egui::{Align, Align2, ComboBox, Image, Layout, Response, RichText, Ui, Vec2, Window};
 use walkers::{MapMemory, sources::Attribution};
 
 pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
@@ -51,7 +51,8 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
 pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
     Window::new("Map Selector")
         .collapsible(true)
-        .resizable(false)
+        .resizable(true)
+        .default_size(Vec2{x: 50., y: 50.})
         .title_bar(false)
         .anchor(Align2::LEFT_TOP, [10., 44.])
         .show(ui.ctx(), |ui| {

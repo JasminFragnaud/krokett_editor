@@ -12,7 +12,7 @@ use std::{
     sync::mpsc::{Receiver, Sender},
 };
 
-use crate::file_utils::{FileContent, FileName, save_as};
+use crate::{file_utils::{FileContent, FileName, save_as}, windows::{clear_gpx_confirmation_modal, cut_tool_controls, map_selector, zoom}};
 use anyhow::Result;
 use egui::{CentralPanel, Context, Frame, Theme, TopBottomPanel, Visuals};
 use tiles::{Provider, TilesKind, providers};
@@ -160,8 +160,6 @@ impl eframe::App for MyApp {
             self.gpx_state.consume_remove_request(remove_request);
 
             {
-                use windows::*;
-
                 cut_tool_controls(self, ui);
                 zoom(ui, &mut self.map_memory);
                 map_selector(self, ui, attributions);
@@ -170,7 +168,7 @@ impl eframe::App for MyApp {
 
         self.gpx_state.show_metadata_editor_window(ctx);
         self.gpx_state.show_segment_editor_window(ctx);
-        windows::clear_gpx_confirmation_modal(self, ctx);
+        clear_gpx_confirmation_modal(self, ctx);
         self.gpx_state.show_toast(ctx);
     }
 }
