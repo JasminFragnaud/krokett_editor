@@ -43,15 +43,10 @@ impl MyApp {
         }
     }
 
-    pub(crate) fn load_gpx_from_disk(&mut self) {
-        if let Ok(file_content) = self.load_gpx_channel.1.try_recv() {
-            match self
-                .gpx_state
-                .load_gpx_from_bytes(&file_content.name, &file_content.data)
-            {
-                Ok(_) => log::info!("GPX file loaded successfully"),
-                Err(e) => log::error!("Error loading GPX file: {e}"),
-            }
+    pub(crate) fn load_gpx_from_disk(&mut self, ctx: &egui::Context) {
+        while let Ok(file_content) = self.load_gpx_channel.1.try_recv() {
+            self.gpx_state
+                .load_gpx_file(&file_content.name, &file_content.data, ctx, &mut self.map_memory);
         }
     }
 
@@ -95,7 +90,7 @@ impl MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.load_gpx_from_disk();
+        self.load_gpx_from_disk(ctx);
         self.handle_save_gpx_result();
 
         self.gpx_state

@@ -611,8 +611,8 @@ impl GpxState {
                                                 (
                                                     checkbox_response.hovered()
                                                         || label_response.hovered(),
-                                                    checkbox_response.clicked()
-                                                        || label_response.clicked(),
+                                                    label_response.clicked(),
+                                                    checkbox_response.rect,
                                                 )
                                             });
                                             let mut full_line_rect = row.response.rect;
@@ -627,7 +627,10 @@ impl GpxState {
                                             let row_clicked = row.response.ctx.input(|input| {
                                                 input.pointer.primary_clicked()
                                                     && input.pointer.interact_pos().is_some_and(
-                                                        |pointer| full_line_rect.contains(pointer),
+                                                        |pointer| {
+                                                            full_line_rect.contains(pointer)
+                                                                && !row.inner.2.contains(pointer)
+                                                        },
                                                     )
                                             });
 
@@ -674,8 +677,8 @@ impl GpxState {
                                                     (
                                                         checkbox_response.hovered()
                                                             || label_response.hovered(),
-                                                        checkbox_response.clicked()
-                                                            || label_response.clicked(),
+                                                        label_response.clicked(),
+                                                        checkbox_response.rect,
                                                     )
                                                 });
                                                 let mut full_line_rect = row.response.rect;
@@ -692,6 +695,7 @@ impl GpxState {
                                                         && input.pointer.interact_pos().is_some_and(
                                                             |pointer| {
                                                                 full_line_rect.contains(pointer)
+                                                                    && !row.inner.2.contains(pointer)
                                                             },
                                                         )
                                                 });
@@ -1040,6 +1044,28 @@ impl GpxState {
                 }
                 Err(error) => errors.push(error),
             }
+        }
+
+        self.finalize_import(imported_segments, errors, imported_bounds, ctx, map_memory);
+    }
+
+    pub(crate) fn load_gpx_file(
+        &mut self,
+        file_name: &str,
+        bytes: &[u8],
+        ctx: &egui::Context,
+        map_memory: &mut MapMemory,
+    ) {
+        let mut imported_segments = 0;
+        let mut errors = Vec::new();
+        let mut imported_bounds = None;
+
+        match self.load_gpx_from_bytes(file_name, bytes) {
+            Ok((count, bounds)) => {
+                imported_segments = count;
+                imported_bounds = bounds;
+            }
+            Err(error) => errors.push(error),
         }
 
         self.finalize_import(imported_segments, errors, imported_bounds, ctx, map_memory);
