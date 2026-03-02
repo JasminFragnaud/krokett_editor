@@ -56,21 +56,50 @@ impl MyApp {
     }
 
     pub(crate) fn save_gpx_to_disk(&mut self) {
+        let data = match self.gpx_state.export_gpx_bytes() {
+            Ok(data) => data,
+            Err(error) => {
+                self.gpx_state
+                    .set_status_message(format!("Error preparing GPX save: {error}"));
+                log::error!("Error preparing GPX save: {error}");
+                return;
+            }
+        };
+
         save_as(
             FileContent {
-                name: "test.gpx".to_string(),
-                data: Vec::new(),
+                name: self.gpx_state.export_file_name(),
+                data,
             },
             self.save_gpx_channel.0.clone(),
         );
+    }
+
+    pub(crate) fn handle_save_gpx_result(&mut self) {
+        while let Ok(save_result) = self.save_gpx_channel.1.try_recv() {
+            match save_result {
+                Ok(file_name) => {
+                    self.gpx_state
+                        .set_status_message(format!("GPX saved: {file_name}"));
+                    log::info!("GPX file saved successfully: {file_name}");
+                }
+                Err(error) => {
+                    self.gpx_state
+                        .set_status_message(format!("Error saving GPX file: {error}"));
+                    log::error!("Error saving GPX file: {error}");
+                }
+            }
+        }
     }
 }
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.load_gpx_from_disk();
+        self.handle_save_gpx_result();
 
-        self.gpx_state.handle_dropped_files(ctx, &mut self.map_memory);
+        self.gpx_state
+            .handle_dropped_files(ctx, &mut self.map_memory);
 
         TopBottomPanel::top("main_menu").show(ctx, |ui| {
             windows::top_menu(self, ui);
