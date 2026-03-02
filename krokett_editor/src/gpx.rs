@@ -991,9 +991,13 @@ impl GpxState {
 
             let result = if let Some(bytes) = file.bytes.as_ref() {
                 self.load_gpx_from_bytes(&file_name, bytes.as_ref())
-            } else if let Some(path) = file.path.as_ref() {
+            } else if file.path.is_some() {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
+                    let path = file
+                        .path
+                        .as_ref()
+                        .expect("file.path.is_some() checked above");
                     match std::fs::read(path) {
                         Ok(bytes) => self.load_gpx_from_bytes(&file_name, &bytes),
                         Err(err) => Err(format!("Could not read {}: {err}", path.display())),
