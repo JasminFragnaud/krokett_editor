@@ -22,10 +22,11 @@ jobs:
       with:
         name: krokett_editor_linux_${{ github.ref_name }}
         path: target/release/krokett_editor_native
+    - run: mv target/release/krokett_editor_native target/release/krokett_editor_linux_${{ github.ref_name }}
     - name: Release bin to GitHub
       uses: softprops/action-gh-release@v2
       with:
-        files: krokett_editor_linux_${{ github.ref_name }}
+        files: target/release/krokett_editor_linux_${{ github.ref_name }}
 
   build_windows:
     runs-on: windows-latest
@@ -41,10 +42,11 @@ jobs:
       with:
         name: krokett_editor_windows_${{ github.ref_name }}.exe
         path: target\release\krokett_editor_native.exe
+    - run: mv target/release/krokett_editor_native target/release/krokett_editor_windows_${{ github.ref_name }}.exe
     - name: Release bin to GitHub
       uses: softprops/action-gh-release@v2
       with:
-        files: krokett_editor_windows_${{ github.ref_name }}.exe
+        files: target\release\krokett_editor_windows_${{ github.ref_name }}.exe
 
   wasm:
     runs-on: ubuntu-latest
