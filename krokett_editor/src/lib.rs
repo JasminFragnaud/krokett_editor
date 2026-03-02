@@ -4,6 +4,7 @@ mod places;
 mod style;
 mod task_utils;
 mod tiles;
+mod toggle_switch;
 mod windows;
 
 use std::{
@@ -13,7 +14,7 @@ use std::{
 
 use crate::file_utils::{FileContent, FileName, save_as};
 use anyhow::Result;
-use egui::{CentralPanel, Context, Frame, TopBottomPanel};
+use egui::{CentralPanel, Context, Frame, Theme, TopBottomPanel, Visuals};
 use tiles::{Provider, TilesKind, providers};
 use walkers::{Map, MapMemory};
 
@@ -22,6 +23,7 @@ pub struct MyApp {
     selected_provider: Provider,
     map_memory: MapMemory,
     gpx_state: gpx::GpxState,
+    dark_mode: bool,
     clear_gpx_confirm_open: bool,
     load_gpx_channel: (Sender<FileContent>, Receiver<FileContent>),
     save_gpx_channel: (Sender<Result<FileName>>, Receiver<Result<FileName>>),
@@ -29,7 +31,15 @@ pub struct MyApp {
 
 impl MyApp {
     pub fn new(egui_ctx: Context) -> Self {
-        egui_ctx.set_style(style::amoled_friendly());
+        let dark_mode = egui_ctx
+            .system_theme()
+            .map(|theme| matches!(theme, Theme::Dark))
+            .unwrap_or_else(|| egui_ctx.style().visuals.dark_mode);
+        if dark_mode {
+            egui_ctx.set_style(style::amoled_friendly());
+        } else {
+            egui_ctx.set_visuals(Visuals::light());
+        }
         egui_material_icons::initialize(&egui_ctx);
 
         Self {
@@ -37,9 +47,23 @@ impl MyApp {
             selected_provider: Provider::IgnRandonnee25k,
             map_memory: MapMemory::default(),
             gpx_state: gpx::GpxState::new(),
+            dark_mode,
             load_gpx_channel: (std::sync::mpsc::channel()),
             save_gpx_channel: (std::sync::mpsc::channel()),
             clear_gpx_confirm_open: false,
+        }
+    }
+
+    pub(crate) fn dark_mode(&self) -> bool {
+        self.dark_mode
+    }
+
+    pub(crate) fn set_dark_mode(&mut self, ctx: &egui::Context, dark_mode: bool) {
+        self.dark_mode = dark_mode;
+        if dark_mode {
+            ctx.set_style(style::amoled_friendly());
+        } else {
+            ctx.set_visuals(Visuals::light());
         }
     }
 

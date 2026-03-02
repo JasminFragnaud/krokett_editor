@@ -1,4 +1,4 @@
-use crate::{MyApp, file_utils::load_file};
+use crate::{MyApp, file_utils::load_file, toggle_switch};
 use egui::{Align, Align2, ComboBox, Image, Layout, Response, RichText, Ui, Window};
 use walkers::{MapMemory, sources::Attribution};
 
@@ -32,6 +32,17 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
                 if ui.checkbox(&mut show_tree, "Show GPX tree").changed() {
                     app.gpx_state.set_tree_window_visible(show_tree);
                 }
+            });
+
+            ui.separator();
+
+            ui.horizontal(|ui| {
+                ui.label("Sombre");
+                let mut dark_mode = app.dark_mode();
+                if ui.add(toggle_switch::toggle(&mut dark_mode)).changed() {
+                    app.set_dark_mode(ui.ctx(), dark_mode);
+                }
+                ui.label("Clair");
             });
         });
     });
