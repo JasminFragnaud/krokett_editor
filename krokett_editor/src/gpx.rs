@@ -734,21 +734,6 @@ impl GpxState {
         Ok((imported_segments, imported_bounds))
     }
 
-    #[cfg(target_arch = "wasm32")]
-    pub(crate) fn load_from_disk_dialog(
-        &mut self,
-        _ctx: &egui::Context,
-        _map_memory: &mut MapMemory,
-    ) {
-        self.status =
-            Some("File dialog is unavailable on this target; use drag and drop".to_owned());
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub(crate) fn save_to_disk_dialog(&mut self) {
-        self.status = Some("Save dialog is unavailable on this target".to_owned());
-    }
-
     fn finalize_import(
         &mut self,
         imported_segments: usize,
