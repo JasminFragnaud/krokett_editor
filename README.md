@@ -1,3 +1,7 @@
+[demo-img]: https://img.shields.io/badge/Web--App-krokett_editor-blue?logo=kitsu
+[demo-url]: https://jasminfragnaud.github.io/krokett_editor/
+[![Web-app][demo-img]][demo-url]
+
 ### 1) Build release for musl
 
 ```bash
