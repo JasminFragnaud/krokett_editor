@@ -21,7 +21,7 @@ pub struct MyApp {
     providers: BTreeMap<Provider, Vec<TilesKind>>,
     selected_provider: Provider,
     map_memory: MapMemory,
-    gpx: gpx::GpxState,
+    gpx_state: gpx::GpxState,
     clear_gpx_confirm_open: bool,
     load_gpx_channel: (Sender<FileContent>, Receiver<FileContent>),
     save_gpx_channel: (Sender<Result<FileName>>, Receiver<Result<FileName>>),
@@ -36,7 +36,7 @@ impl MyApp {
             providers: providers(egui_ctx.to_owned()),
             selected_provider: Provider::IgnRandonnee25k,
             map_memory: MapMemory::default(),
-            gpx: gpx::GpxState::new(),
+            gpx_state: gpx::GpxState::new(),
             load_gpx_channel: (std::sync::mpsc::channel()),
             save_gpx_channel: (std::sync::mpsc::channel()),
             clear_gpx_confirm_open: false,
@@ -46,7 +46,7 @@ impl MyApp {
     pub(crate) fn load_gpx_from_disk(&mut self) {
         if let Ok(file_content) = self.load_gpx_channel.1.try_recv() {
             match self
-                .gpx
+                .gpx_state
                 .load_gpx_from_bytes(&file_content.name, &file_content.data)
             {
                 Ok(_) => log::info!("GPX file loaded successfully"),
@@ -70,16 +70,16 @@ impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.load_gpx_from_disk();
 
-        self.gpx.handle_dropped_files(ctx, &mut self.map_memory);
+        self.gpx_state.handle_dropped_files(ctx, &mut self.map_memory);
 
         TopBottomPanel::top("main_menu").show(ctx, |ui| {
             windows::top_menu(self, ui);
         });
 
-        self.gpx.show_tree_window(ctx);
+        self.gpx_state.show_tree_window(ctx);
 
         CentralPanel::default().frame(Frame::NONE).show(ctx, |ui| {
-            self.gpx
+            self.gpx_state
                 .apply_pending_fit(ui.available_size(), &mut self.map_memory);
 
             let my_position = places::amancy();
@@ -93,7 +93,7 @@ impl eframe::App for MyApp {
             let mut map = Map::new(None, &mut self.map_memory, my_position).zoom_with_ctrl(false);
 
             let (map_with_plugins, clicked_track, clicked_segment, cut_request, remove_request) =
-                self.gpx.add_plugins(map);
+                self.gpx_state.add_plugins(map);
             map = map_with_plugins;
 
             for (n, tiles) in tiles.iter_mut().enumerate() {
@@ -102,10 +102,10 @@ impl eframe::App for MyApp {
             }
 
             ui.add(map);
-            self.gpx.consume_track_click(clicked_track);
-            self.gpx.consume_segment_click(clicked_segment);
-            self.gpx.consume_cut_request(cut_request);
-            self.gpx.consume_remove_request(remove_request);
+            self.gpx_state.consume_track_click(clicked_track);
+            self.gpx_state.consume_segment_click(clicked_segment);
+            self.gpx_state.consume_cut_request(cut_request);
+            self.gpx_state.consume_remove_request(remove_request);
 
             {
                 use windows::*;
@@ -116,9 +116,9 @@ impl eframe::App for MyApp {
             }
         });
 
-        self.gpx.show_metadata_editor_window(ctx);
-        self.gpx.show_segment_editor_window(ctx);
+        self.gpx_state.show_metadata_editor_window(ctx);
+        self.gpx_state.show_segment_editor_window(ctx);
         windows::clear_gpx_confirmation_modal(self, ctx);
-        self.gpx.show_toast(ctx);
+        self.gpx_state.show_toast(ctx);
     }
 }

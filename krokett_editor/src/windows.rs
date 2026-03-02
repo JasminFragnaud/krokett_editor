@@ -16,21 +16,21 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
                     ui.close();
                 }
 
-                if app.gpx.tracks_count() > 0 && ui.button("Remove GPXs").clicked() {
-                    if app.gpx.tracks_count() > 0 {
+                if app.gpx_state.tracks_count() > 0 && ui.button("Remove GPXs").clicked() {
+                    if app.gpx_state.tracks_count() > 0 {
                         app.clear_gpx_confirm_open = true;
                     }
                     ui.close();
                 }
 
-                let mut auto_fit = app.gpx.auto_fit_enabled();
+                let mut auto_fit = app.gpx_state.auto_fit_enabled();
                 if ui.checkbox(&mut auto_fit, "Auto-fit GPX on load").changed() {
-                    app.gpx.set_auto_fit_enabled(auto_fit);
+                    app.gpx_state.set_auto_fit_enabled(auto_fit);
                 }
 
-                let mut show_tree = app.gpx.tree_window_visible();
+                let mut show_tree = app.gpx_state.tree_window_visible();
                 if ui.checkbox(&mut show_tree, "Show GPX tree").changed() {
-                    app.gpx.set_tree_window_visible(show_tree);
+                    app.gpx_state.set_tree_window_visible(show_tree);
                 }
             });
         });
@@ -63,15 +63,15 @@ pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
 
             ui.separator();
             ui.label("Drop .gpx files on the map to display tracks");
-            ui.label(format!("GPX segments: {}", app.gpx.tracks_count()));
+            ui.label(format!("GPX segments: {}", app.gpx_state.tracks_count()));
 
-            if app.gpx.cut_tool_enabled() {
+            if app.gpx_state.cut_tool_enabled() {
                 ui.label(
                     "Cut tool enabled — Left click: cut, Right click separator: merge adjacent",
                 );
             }
 
-            if let Some(status) = app.gpx.status() {
+            if let Some(status) = app.gpx_state.status() {
                 ui.label(status);
             }
         });
@@ -103,7 +103,7 @@ pub fn clear_gpx_confirmation_modal(app: &mut MyApp, ctx: &egui::Context) {
         });
 
     if confirm {
-        app.gpx.clear();
+        app.gpx_state.clear();
         app.clear_gpx_confirm_open = false;
     } else if modal_response.should_close() {
         app.clear_gpx_confirm_open = false;
@@ -121,9 +121,9 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
         .title_bar(false)
         .anchor(Align2::RIGHT_TOP, [-10., 44.])
         .show(ui.ctx(), |ui| {
-            let mut cut_tool = app.gpx.cut_tool_enabled();
+            let mut cut_tool = app.gpx_state.cut_tool_enabled();
             if ui.checkbox(&mut cut_tool, "Segment edit").changed() {
-                app.gpx.set_cut_tool_enabled(cut_tool);
+                app.gpx_state.set_cut_tool_enabled(cut_tool);
             }
         });
 }
