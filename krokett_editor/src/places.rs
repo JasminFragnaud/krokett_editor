@@ -1,6 +1,6 @@
 //! Few common places used in the example app.
 
-use walkers::{lon_lat, Position};
+use walkers::{Position, lon_lat};
 
 /// Center of Amancy, Haute-Savoie, France.
 pub fn amancy() -> Position {

@@ -1,7 +1,7 @@
 [package]
 name = "krokett_editor_native"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 publish = false
 default-run = "krokett_editor_native"
 
