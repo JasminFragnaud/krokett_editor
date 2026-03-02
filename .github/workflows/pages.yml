@@ -15,6 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Trunk
         run: cargo install trunk@0.20.3 --locked
+      - uses: Swatinem/rust-cache@v2
       - name: Build
         run: env -C krokett_editor_web trunk build --release --public-url .
       - name: Deploy
