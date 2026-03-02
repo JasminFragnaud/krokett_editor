@@ -11,7 +11,7 @@ use std::{
     sync::mpsc::{Receiver, Sender},
 };
 
-use crate::file_utils::{FileContent, FileName};
+use crate::file_utils::{FileContent, FileName, save_as};
 use anyhow::Result;
 use egui::{CentralPanel, Context, Frame, TopBottomPanel};
 use tiles::{Provider, TilesKind, providers};
@@ -43,45 +43,6 @@ impl MyApp {
         }
     }
 
-    pub(crate) fn gpx_tracks_count(&self) -> usize {
-        self.gpx.tracks_count()
-    }
-
-    pub(crate) fn gpx_status(&self) -> Option<&str> {
-        self.gpx.status()
-    }
-
-    pub(crate) fn clear_gpx_tracks(&mut self) {
-        self.gpx.clear();
-    }
-
-    pub(crate) fn request_clear_gpx_tracks(&mut self) {
-        if self.gpx_tracks_count() > 0 {
-            self.clear_gpx_confirm_open = true;
-        }
-    }
-
-    pub(crate) fn confirm_clear_gpx_tracks(&mut self) {
-        self.clear_gpx_tracks();
-        self.clear_gpx_confirm_open = false;
-    }
-
-    pub(crate) fn cancel_clear_gpx_tracks(&mut self) {
-        self.clear_gpx_confirm_open = false;
-    }
-
-    pub(crate) fn clear_gpx_confirm_open(&self) -> bool {
-        self.clear_gpx_confirm_open
-    }
-
-    pub(crate) fn gpx_auto_fit_enabled(&self) -> bool {
-        self.gpx.auto_fit_enabled()
-    }
-
-    pub(crate) fn set_gpx_auto_fit_enabled(&mut self, enabled: bool) {
-        self.gpx.set_auto_fit_enabled(enabled);
-    }
-
     pub(crate) fn load_gpx_from_disk(&mut self) {
         if let Ok(file_content) = self.load_gpx_channel.1.try_recv() {
             match self
@@ -94,20 +55,14 @@ impl MyApp {
         }
     }
 
-    pub(crate) fn gpx_cut_tool_enabled(&self) -> bool {
-        self.gpx.cut_tool_enabled()
-    }
-
-    pub(crate) fn set_gpx_cut_tool_enabled(&mut self, enabled: bool) {
-        self.gpx.set_cut_tool_enabled(enabled);
-    }
-
-    pub(crate) fn gpx_tree_window_visible(&self) -> bool {
-        self.gpx.tree_window_visible()
-    }
-
-    pub(crate) fn set_gpx_tree_window_visible(&mut self, visible: bool) {
-        self.gpx.set_tree_window_visible(visible);
+    pub(crate) fn save_gpx_to_disk(&mut self) {
+        save_as(
+            FileContent {
+                name: "test.gpx".to_string(),
+                data: Vec::new(),
+            },
+            self.save_gpx_channel.0.clone(),
+        );
     }
 }
 
