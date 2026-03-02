@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 
 use egui::{Color32, PointerButton, Pos2};
+use egui_notify::{Anchor, Toasts};
 use egui_ltreeview::{NodeBuilder, TreeView};
 use itertools::Itertools as _;
 use walkers::{Map, MapMemory, Plugin};
@@ -90,8 +90,7 @@ pub(crate) struct GpxState {
     status: Option<String>,
     pending_gpx_fit: Option<GpxBounds>,
     auto_fit_enabled: bool,
-    toast_message: Option<String>,
-    toast_until: Option<Instant>,
+    toasts: Toasts,
     metadata_editor_open: bool,
     selected_track_index: Option<TrackSelection>,
     segment_editor_open: bool,
@@ -112,8 +111,7 @@ impl GpxState {
             status: None,
             pending_gpx_fit: None,
             auto_fit_enabled: true,
-            toast_message: None,
-            toast_until: None,
+            toasts: Toasts::default().with_anchor(Anchor::BottomRight),
             metadata_editor_open: false,
             selected_track_index: None,
             segment_editor_open: false,
@@ -147,8 +145,7 @@ impl GpxState {
     pub(crate) fn set_status_message(&mut self, message: impl Into<String>) {
         let message = message.into();
         self.status = Some(message.clone());
-        self.toast_message = Some(message);
-        self.toast_until = Some(Instant::now() + Duration::from_secs(5));
+        self.toasts.info(message);
     }
 
     pub(crate) fn export_file_name(&self) -> String {
@@ -445,29 +442,7 @@ impl GpxState {
     }
 
     pub(crate) fn show_toast(&mut self, ctx: &egui::Context) {
-        let Some(until) = self.toast_until else {
-            return;
-        };
-
-        if Instant::now() > until {
-            self.toast_until = None;
-            self.toast_message = None;
-            return;
-        }
-
-        let Some(message) = self.toast_message.as_ref() else {
-            return;
-        };
-
-        egui::Area::new("gpx_toast".into())
-            .anchor(egui::Align2::RIGHT_BOTTOM, [-12.0, -12.0])
-            .show(ctx, |ui| {
-                egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.label(message);
-                });
-            });
-
-        ctx.request_repaint_after(Duration::from_millis(100));
+        self.toasts.show(ctx);
     }
 
     pub(crate) fn auto_fit_enabled(&self) -> bool {
@@ -968,14 +943,17 @@ impl GpxState {
         map_memory: &mut MapMemory,
     ) {
         self.status = if !errors.is_empty() {
-            Some(errors.join(" | "))
+            let message = errors.join(" | ");
+            self.toasts.error(message.clone());
+            Some(message)
         } else if imported_segments > 0 {
             let message = format!("Loaded {imported_segments} GPX segment(s)");
-            self.toast_message = Some(message.clone());
-            self.toast_until = Some(Instant::now() + Duration::from_secs(5));
+            self.toasts.success(message.clone());
             Some(message)
         } else {
-            Some("No GPX data imported".to_owned())
+            let message = "No GPX data imported".to_owned();
+            self.toasts.warning(message.clone());
+            Some(message)
         };
 
         if imported_segments > 0 {
@@ -1283,8 +1261,7 @@ impl GpxState {
         self.selected_segment = Some((track_selection, segment_index + 1));
         self.segment_editor_open = true;
         self.status = Some("Segment cut".to_owned());
-        self.toast_message = Some("Segment cut".to_owned());
-        self.toast_until = Some(Instant::now() + Duration::from_secs(5));
+        self.toasts.success("Segment cut");
     }
 
     pub(crate) fn consume_remove_request(
@@ -1360,9 +1337,8 @@ impl GpxState {
 
         self.selected_segment = Some((track_selection, left_idx));
         self.segment_editor_open = true;
-        self.status = Some("Segments merged".to_owned());
-        self.toast_message = Some("Segments merged".to_owned());
-        self.toast_until = Some(Instant::now() + Duration::from_secs(5));
+        self.status = Some("Segment removed".to_owned());
+        self.toasts.success("Segment removed");
     }
 }
 
