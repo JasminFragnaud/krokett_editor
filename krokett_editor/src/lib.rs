@@ -12,7 +12,10 @@ use std::{
     sync::mpsc::{Receiver, Sender},
 };
 
-use crate::{file_utils::{FileContent, FileName, save_as}, windows::{clear_gpx_confirmation_modal, cut_tool_controls, map_selector, zoom}};
+use crate::{
+    file_utils::{FileContent, FileName, save_as},
+    windows::{clear_gpx_confirmation_modal, cut_tool_controls, map_selector, zoom},
+};
 use anyhow::Result;
 use egui::{CentralPanel, Context, Frame, Theme, TopBottomPanel, Visuals};
 use tiles::{Provider, TilesKind, providers};

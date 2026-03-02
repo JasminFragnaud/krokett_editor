@@ -52,7 +52,7 @@ pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
     Window::new("Map Selector")
         .collapsible(true)
         .resizable(true)
-        .default_size(Vec2{x: 50., y: 50.})
+        .default_size(Vec2 { x: 50., y: 50. })
         .title_bar(false)
         .anchor(Align2::LEFT_TOP, [10., 44.])
         .show(ui.ctx(), |ui| {
