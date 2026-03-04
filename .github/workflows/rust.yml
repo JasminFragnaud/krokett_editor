@@ -56,7 +56,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
-    - run: cargo install trunk@0.21.14 --locked
+    - name: Install trunk
+      run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
     - name: Build Web
       run: env -C krokett_editor_web trunk build
 
