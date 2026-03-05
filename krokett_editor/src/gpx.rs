@@ -8,6 +8,8 @@ use egui_notify::{Anchor, Toasts};
 use itertools::Itertools as _;
 use walkers::{Map, MapMemory, Plugin};
 
+use crate::constants::Colors;
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum GpxTrackKind {
     Track,
@@ -375,6 +377,25 @@ impl GpxState {
                     None
                 } else {
                     Some(description)
+                };
+            }
+        }
+    }
+
+    fn segment_comment(&self, selection: SegmentSelection) -> String {
+        self.segment_waypoints(selection)
+            .and_then(|waypoints| waypoints.first())
+            .and_then(|waypoint| waypoint.comment.clone())
+            .unwrap_or_default()
+    }
+
+    fn set_segment_comment(&mut self, selection: SegmentSelection, comment: String) {
+        if let Some(waypoints) = self.segment_waypoints_mut(selection) {
+            if let Some(first) = waypoints.first_mut() {
+                first.comment = if comment.trim().is_empty() {
+                    None
+                } else {
+                    Some(comment)
                 };
             }
         }
@@ -798,6 +819,7 @@ impl GpxState {
             .track_name(track_selection)
             .unwrap_or_else(|| "Unnamed".to_owned());
         let mut segment_description = self.segment_description((track_selection, segment_index));
+        let mut segment_comment = self.segment_comment((track_selection, segment_index));
 
         let response = egui::Window::new("Segment metadata")
             .open(&mut open)
@@ -830,11 +852,70 @@ impl GpxState {
                     }
                 });
                 ui.separator();
+                ui.label("Color presets");
+                ui.horizontal(|ui| {
+                    let button_size = egui::vec2(30.0, 20.0);
+                    let selected_stroke = egui::Stroke::new(2.0, Color32::WHITE);
+                    let unselected_stroke = egui::Stroke::new(2.0, Color32::TRANSPARENT);
+
+                    let with_description_text = Colors::to_string(Colors::SEGMENT_WITH_DESCRIPTION);
+                    let to_explore_text = Colors::to_string(Colors::SEGMENT_TO_EXPLORE);
+
+                    let with_description_selected = segment_comment.trim() == with_description_text;
+                    let to_explore_selected = segment_comment.trim() == to_explore_text;
+
+                    let mut with_description_button =
+                        egui::Button::new("").fill(Colors::SEGMENT_WITH_DESCRIPTION);
+                    with_description_button = with_description_button.min_size(button_size).stroke(
+                        if with_description_selected {
+                            selected_stroke
+                        } else {
+                            unselected_stroke
+                        },
+                    );
+
+                    let mut to_explore_button =
+                        egui::Button::new("").fill(Colors::SEGMENT_TO_EXPLORE);
+                    to_explore_button =
+                        to_explore_button
+                            .min_size(button_size)
+                            .stroke(if to_explore_selected {
+                                selected_stroke
+                            } else {
+                                unselected_stroke
+                            });
+
+                    if ui
+                        .add(with_description_button)
+                        .on_hover_text("SEGMENT_WITH_DESCRIPTION")
+                        .clicked()
+                    {
+                        if with_description_selected {
+                            segment_comment.clear();
+                        } else {
+                            segment_comment = with_description_text;
+                        }
+                    }
+
+                    if ui
+                        .add(to_explore_button)
+                        .on_hover_text("SEGMENT_TO_EXPLORE")
+                        .clicked()
+                    {
+                        if to_explore_selected {
+                            segment_comment.clear();
+                        } else {
+                            segment_comment = to_explore_text;
+                        }
+                    }
+                });
+                ui.separator();
                 ui.label("Description");
                 ui.text_edit_multiline(&mut segment_description);
             });
 
         self.set_segment_description((track_selection, segment_index), segment_description);
+        self.set_segment_comment((track_selection, segment_index), segment_comment);
 
         let window_hovered = response
             .as_ref()
@@ -1110,10 +1191,16 @@ impl GpxState {
                         .first()
                         .and_then(|waypoint| waypoint.description.clone())
                         .unwrap_or_default();
+                    let comment = segment
+                        .points
+                        .first()
+                        .and_then(|waypoint| waypoint.comment.clone())
+                        .unwrap_or_default();
 
                     map = map.with_plugin(GpxPolyline {
                         positions,
                         description,
+                        comment,
                         track_selection,
                         segment_index,
                         has_previous_separator: segment_index > 0,
@@ -1156,10 +1243,16 @@ impl GpxState {
                     .first()
                     .and_then(|waypoint| waypoint.description.clone())
                     .unwrap_or_default();
+                let comment = route
+                    .points
+                    .first()
+                    .and_then(|waypoint| waypoint.comment.clone())
+                    .unwrap_or_default();
 
                 map = map.with_plugin(GpxPolyline {
                     positions,
                     description,
+                    comment,
                     track_selection,
                     segment_index: 0,
                     has_previous_separator: false,
@@ -1352,6 +1445,7 @@ impl GpxState {
 struct GpxPolyline {
     positions: Vec<walkers::Position>,
     description: String,
+    comment: String,
     track_selection: TrackSelection,
     segment_index: usize,
     has_previous_separator: bool,
@@ -1504,15 +1598,19 @@ impl Plugin for GpxPolyline {
             });
         }
 
+        let parsed_color = Colors::from_string(self.comment.trim());
+
         let stroke = if hovered || self.window_highlighted {
             // segment hover
-            egui::Stroke::new(5.0, Color32::from_rgb(14, 214, 85))
+            egui::Stroke::new(5.0, Colors::SEGMENT_HOOVER)
+        } else if let Some(parsed_color) = parsed_color {
+            egui::Stroke::new(4.0, parsed_color)
         } else if !self.description.trim().is_empty() {
             // segment with description
-            egui::Stroke::new(4.0, Color32::from_rgb(30, 100, 190))
+            egui::Stroke::new(4.0, Colors::SEGMENT_WITH_DESCRIPTION)
         } else {
             // segment not hover no description
-            egui::Stroke::new(4.0, Color32::from_rgb(255, 111, 0))
+            egui::Stroke::new(4.0, Colors::SEGMENT_DEFAULT)
         };
 
         for (from, to) in self.positions.iter().tuple_windows() {
