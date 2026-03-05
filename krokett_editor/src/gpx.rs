@@ -102,6 +102,9 @@ pub(crate) struct GpxState {
     tree_hover_track: Option<TrackSelection>,
     tree_hover_segment: Option<SegmentSelection>,
     cut_tool_enabled: bool,
+    filter_with_description_color: bool,
+    filter_to_explore_color: bool,
+    filter_no_color_or_description: bool,
 }
 
 impl GpxState {
@@ -123,7 +126,28 @@ impl GpxState {
             tree_hover_track: None,
             tree_hover_segment: None,
             cut_tool_enabled: false,
+            filter_with_description_color: false,
+            filter_to_explore_color: false,
+            filter_no_color_or_description: false,
         }
+    }
+
+    fn segment_matches_active_filters(&self, description: &str, comment: &str) -> bool {
+        let has_active_filter = self.filter_with_description_color
+            || self.filter_to_explore_color
+            || self.filter_no_color_or_description;
+
+        if !has_active_filter {
+            return true;
+        }
+
+        let parsed_color = Colors::from_string(comment.trim());
+        let has_description = !description.trim().is_empty();
+        let no_color_or_description = parsed_color.is_none() && description.trim().is_empty();
+
+        (self.filter_with_description_color && has_description)
+            || (self.filter_to_explore_color && parsed_color == Some(Colors::SEGMENT_TO_EXPLORE))
+            || (self.filter_no_color_or_description && no_color_or_description)
     }
 
     pub(crate) fn tracks_count(&self) -> usize {
@@ -514,6 +538,62 @@ impl GpxState {
                     return;
                 }
 
+                ui.horizontal(|ui| {
+                    let button_size = egui::vec2(30.0, 20.0);
+                    let selected_stroke = egui::Stroke::new(2.0, Color32::WHITE);
+                    let unselected_stroke = egui::Stroke::new(2.0, Color32::TRANSPARENT);
+
+                    let with_description_button = egui::Button::new("")
+                        .fill(Colors::SEGMENT_WITH_DESCRIPTION)
+                        .min_size(button_size)
+                        .stroke(if self.filter_with_description_color {
+                            selected_stroke
+                        } else {
+                            unselected_stroke
+                        });
+                    if ui
+                        .add(with_description_button)
+                        .on_hover_text("Filter SEGMENT_WITH_DESCRIPTION")
+                        .clicked()
+                    {
+                        self.filter_with_description_color = !self.filter_with_description_color;
+                    }
+
+                    let to_explore_button = egui::Button::new("")
+                        .fill(Colors::SEGMENT_TO_EXPLORE)
+                        .min_size(button_size)
+                        .stroke(if self.filter_to_explore_color {
+                            selected_stroke
+                        } else {
+                            unselected_stroke
+                        });
+                    if ui
+                        .add(to_explore_button)
+                        .on_hover_text("Filter SEGMENT_TO_EXPLORE")
+                        .clicked()
+                    {
+                        self.filter_to_explore_color = !self.filter_to_explore_color;
+                    }
+
+                    let no_button = egui::Button::new("NO")
+                        .min_size(egui::vec2(40.0, 20.0))
+                        .stroke(if self.filter_no_color_or_description {
+                            selected_stroke
+                        } else {
+                            unselected_stroke
+                        });
+                    if ui
+                        .add(no_button)
+                        .on_hover_text(
+                            "Filter segments with no color information and no description",
+                        )
+                        .clicked()
+                    {
+                        self.filter_no_color_or_description = !self.filter_no_color_or_description;
+                    }
+                });
+                ui.separator();
+
                 let mut hover_track = None;
                 let mut hover_segment = None;
                 let mut click_track = None;
@@ -539,7 +619,12 @@ impl GpxState {
                             }
                             if let Some(segment_count) = self.segment_count(track_selection) {
                                 if (0..segment_count).any(|segment_index| {
-                                    !self.is_segment_visible((track_selection, segment_index))
+                                    let selection = (track_selection, segment_index);
+                                    let description = self.segment_description(selection);
+                                    let comment = self.segment_comment(selection);
+                                    let matches_filter =
+                                        self.segment_matches_active_filters(&description, &comment);
+                                    !(self.is_segment_visible(selection) && matches_filter)
                                 }) {
                                     file_visible = false;
                                     break;
@@ -581,7 +666,21 @@ impl GpxState {
                             for (in_file_index, &track_selection) in
                                 track_selections.iter().enumerate()
                             {
-                                let mut track_visible = self.is_track_visible(track_selection);
+                                let mut track_visible = self.is_track_visible(track_selection)
+                                    && (0..self.segment_count(track_selection).unwrap_or(0)).all(
+                                        |segment_index| {
+                                            let selection = (track_selection, segment_index);
+                                            let description = self.segment_description(selection);
+                                            let comment = self.segment_comment(selection);
+                                            let matches_filter = self
+                                                .segment_matches_active_filters(
+                                                    &description,
+                                                    &comment,
+                                                );
+                                            self.is_segment_visible(selection) && matches_filter
+                                        },
+                                    );
+
                                 let default_prefix = match track_selection.kind {
                                     GpxTrackKind::Track => "Track",
                                     GpxTrackKind::Route => "Route",
@@ -643,16 +742,16 @@ impl GpxState {
                                     let segment_count =
                                         self.segment_count(track_selection).unwrap_or(0);
                                     for segment_index in 0..segment_count {
-                                        let mut segment_visible = self
-                                            .is_segment_visible((track_selection, segment_index));
-                                        let segment_label = format!(
-                                            "{}: {}",
-                                            segment_index + 1,
-                                            self.segment_description((
-                                                track_selection,
-                                                segment_index
-                                            ))
-                                        );
+                                        let selection = (track_selection, segment_index);
+                                        let description = self.segment_description(selection);
+                                        let comment = self.segment_comment(selection);
+                                        let matches_filter = self
+                                            .segment_matches_active_filters(&description, &comment);
+
+                                        let mut segment_visible =
+                                            self.is_segment_visible(selection) && matches_filter;
+                                        let segment_label =
+                                            format!("{}: {}", segment_index + 1, description);
 
                                         builder.node(
                                             NodeBuilder::leaf(GpxTreeNodeId::Segment(
@@ -1197,6 +1296,10 @@ impl GpxState {
                         .and_then(|waypoint| waypoint.comment.clone())
                         .unwrap_or_default();
 
+                    if !self.segment_matches_active_filters(&description, &comment) {
+                        continue;
+                    }
+
                     map = map.with_plugin(GpxPolyline {
                         positions,
                         description,
@@ -1248,6 +1351,10 @@ impl GpxState {
                     .first()
                     .and_then(|waypoint| waypoint.comment.clone())
                     .unwrap_or_default();
+
+                if !self.segment_matches_active_filters(&description, &comment) {
+                    continue;
+                }
 
                 map = map.with_plugin(GpxPolyline {
                     positions,
