@@ -1509,7 +1509,7 @@ impl Plugin for GpxPolyline {
             egui::Stroke::new(5.0, Color32::from_rgb(14, 214, 85))
         } else if !self.description.trim().is_empty() {
             // segment with description
-            egui::Stroke::new(4.0, Color32::from_rgb(65, 130, 210))
+            egui::Stroke::new(4.0, Color32::from_rgb(30, 100, 190))
         } else {
             // segment not hover no description
             egui::Stroke::new(4.0, Color32::from_rgb(255, 111, 0))
@@ -1531,7 +1531,7 @@ impl Plugin for GpxPolyline {
             if self.cut_tool_enabled && self.has_previous_separator {
                 ui.painter().circle(
                     p,
-                    6.5,
+                    6.,
                     Color32::from_rgb(255, 224, 96),
                     egui::Stroke::new(1.5, Color32::from_rgb(45, 45, 45)),
                 );
@@ -1544,7 +1544,7 @@ impl Plugin for GpxPolyline {
             if self.cut_tool_enabled && self.has_next_separator {
                 ui.painter().circle(
                     p,
-                    6.5,
+                    6.,
                     Color32::from_rgb(255, 224, 96),
                     egui::Stroke::new(1.5, Color32::from_rgb(45, 45, 45)),
                 );
