@@ -1,3 +1,5 @@
+#[cfg(target_os = "android")]
+pub mod android_intent_io;
 mod constants;
 mod file_utils;
 mod gpx;
@@ -19,17 +21,8 @@ use crate::{
 };
 use anyhow::Result;
 use egui::{CentralPanel, Context, Frame, Theme, TopBottomPanel, Visuals};
-#[cfg(target_os = "android")]
-use egui_file_dialog::FileDialog;
 use tiles::{Provider, TilesKind, providers};
 use walkers::{Map, MapMemory};
-
-#[cfg(target_os = "android")]
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum AndroidFileDialogAction {
-    Load,
-    Save,
-}
 
 pub struct MyApp {
     providers: BTreeMap<Provider, Vec<TilesKind>>,
@@ -40,12 +33,6 @@ pub struct MyApp {
     clear_gpx_confirm_open: bool,
     load_gpx_channel: (Sender<FileContent>, Receiver<FileContent>),
     save_gpx_channel: (Sender<Result<FileName>>, Receiver<Result<FileName>>),
-    #[cfg(target_os = "android")]
-    file_dialog: FileDialog,
-    #[cfg(target_os = "android")]
-    android_file_dialog_action: Option<AndroidFileDialogAction>,
-    #[cfg(target_os = "android")]
-    android_pending_save_content: Option<FileContent>,
 }
 
 impl MyApp {
@@ -70,12 +57,6 @@ impl MyApp {
             load_gpx_channel: (std::sync::mpsc::channel()),
             save_gpx_channel: (std::sync::mpsc::channel()),
             clear_gpx_confirm_open: false,
-            #[cfg(target_os = "android")]
-            file_dialog: FileDialog::new().as_modal(true),
-            #[cfg(target_os = "android")]
-            android_file_dialog_action: None,
-            #[cfg(target_os = "android")]
-            android_pending_save_content: None,
         }
     }
 
@@ -129,9 +110,12 @@ impl MyApp {
 
         #[cfg(target_os = "android")]
         {
-            self.android_pending_save_content = Some(content);
-            self.android_file_dialog_action = Some(AndroidFileDialogAction::Save);
-            self.file_dialog.save_file();
+            if let Err(error) = android_intent_io::request_save_gpx(content.name, content.data) {
+                self.gpx_state.set_status_message(format!(
+                    "Erreur lors de la demande de sauvegarde Android : {error}"
+                ));
+                log::error!("Erreur lors de la demande de sauvegarde Android : {error}");
+            }
         }
     }
 
@@ -143,29 +127,50 @@ impl MyApp {
 
         #[cfg(target_os = "android")]
         {
-            self.android_file_dialog_action = Some(AndroidFileDialogAction::Load);
-            self.file_dialog.pick_file();
+            if let Err(error) = android_intent_io::request_open_gpx() {
+                self.gpx_state.set_status_message(format!(
+                    "Erreur lors de la demande d'ouverture Android : {error}"
+                ));
+                log::error!("Erreur lors de la demande d'ouverture Android : {error}");
+            }
         }
     }
 
     #[cfg(target_os = "android")]
-    fn handle_android_file_dialog(&mut self, ctx: &egui::Context) {
-        self.file_dialog.update(ctx);
-
-        let Some(path) = self.file_dialog.take_picked() else {
-            return;
-        };
-
-        match self.android_file_dialog_action.take() {
-            Some(AndroidFileDialogAction::Load) => {
-                file_utils::load_file_from_path(path, self.load_gpx_channel.0.clone());
-            }
-            Some(AndroidFileDialogAction::Save) => {
-                if let Some(content) = self.android_pending_save_content.take() {
-                    file_utils::save_as_to_path(path, content, self.save_gpx_channel.0.clone());
+    fn handle_android_intent_results(&mut self, ctx: &egui::Context) {
+        for open_result in android_intent_io::drain_open_results() {
+            match open_result {
+                Ok(file_content) => {
+                    self.gpx_state.load_gpx_file(
+                        &file_content.name,
+                        &file_content.data,
+                        ctx,
+                        &mut self.map_memory,
+                    );
+                }
+                Err(error) => {
+                    self.gpx_state.set_status_message(format!(
+                        "Erreur lors de l'ouverture du fichier GPX : {error}"
+                    ));
+                    log::error!("Erreur lors de l'ouverture du fichier GPX : {error}");
                 }
             }
-            None => {}
+        }
+
+        for save_result in android_intent_io::drain_save_results() {
+            match save_result {
+                Ok(file_name) => {
+                    self.gpx_state
+                        .set_status_message(format!("GPX sauvegarde : {file_name}"));
+                    log::info!("Fichier GPX sauvegarde avec succes : {file_name}");
+                }
+                Err(error) => {
+                    self.gpx_state.set_status_message(format!(
+                        "Erreur lors de la sauvegarde du fichier GPX : {error}"
+                    ));
+                    log::error!("Erreur lors de la sauvegarde du fichier GPX : {error}");
+                }
+            }
         }
     }
 
@@ -191,7 +196,7 @@ impl MyApp {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(target_os = "android")]
-        self.handle_android_file_dialog(ctx);
+        self.handle_android_intent_results(ctx);
 
         self.load_gpx_from_disk(ctx);
         self.handle_save_gpx_result();

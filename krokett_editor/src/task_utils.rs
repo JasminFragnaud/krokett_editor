@@ -1,6 +1,7 @@
+#[cfg(any(target_arch = "wasm32", not(target_os = "android")))]
 use std::future::Future;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 pub fn execute<F: Future<Output = ()> + Send + 'static>(f: F) {
     std::thread::spawn(move || futures::executor::block_on(f));
 }
