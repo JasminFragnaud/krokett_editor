@@ -21,3 +21,13 @@ fn android_main(
 
     Ok(())
 }
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "system" fn Java_com_github_khep_krokett_1editor_MainActivity_setAppInBackground(
+    _env: *mut jni_sys::JNIEnv,
+    _class: jni_sys::jclass,
+    is_background: jni_sys::jboolean,
+) {
+    log::info!("App moved to background: {is_background}");
+}

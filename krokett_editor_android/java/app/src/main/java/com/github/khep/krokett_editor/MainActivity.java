@@ -1,4 +1,4 @@
-package com.github.JasminFragnaud.krokett_editor;
+package com.github.khep.krokett_editor;
 
 import android.os.Bundle;
 import android.util.Log;
@@ -54,15 +54,15 @@ public class MainActivity extends GameActivity {
       return super.onTouchEvent(event);
   }
 
-  @Override
-    protected void onPause() {
+      @Override
+      protected void onPause() {
         super.onPause();
         setAppInBackground(true);
-    }
+      }
 
-    @Override
-    protected void onResume() {
+      @Override
+      protected void onResume() {
         super.onResume();
         setAppInBackground(false);
-    }
+      }
 }

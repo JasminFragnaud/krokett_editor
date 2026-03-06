@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 log = "0.4"
 android_logger = "0.15"
+jni-sys = "0.4"
 eframe = { workspace = true, features = ["wgpu", "android-game-activity"] }
 egui-winit.workspace = true
 krokett_editor = { path = "../../krokett_editor" }
