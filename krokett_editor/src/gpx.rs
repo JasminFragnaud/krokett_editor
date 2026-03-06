@@ -9,6 +9,7 @@ use itertools::Itertools as _;
 use walkers::{Map, MapMemory, Plugin};
 
 use crate::constants::Colors;
+use crate::constants::GPX_EXTENSION;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum GpxTrackKind {
@@ -180,18 +181,18 @@ impl GpxState {
             .first()
             .and_then(|document| document.metadata.as_ref())
             .and_then(|metadata| metadata.name.clone())
-            .unwrap_or_else(|| "tracks".to_owned());
+            .unwrap_or_else(|| "traces".to_owned());
 
-        if base_name.to_ascii_lowercase().ends_with(".gpx") {
+        if base_name.to_ascii_lowercase().ends_with(GPX_EXTENSION) {
             base_name
         } else {
-            format!("{base_name}.gpx")
+            format!("{base_name}{GPX_EXTENSION}")
         }
     }
 
     pub(crate) fn export_gpx_bytes(&self) -> Result<Vec<u8>, String> {
         if self.gpx_documents.is_empty() {
-            return Err("No GPX data to save".to_owned());
+            return Err("Pas de GPX à sauvegarder".to_owned());
         }
 
         let mut merged = gpx::Gpx {
@@ -216,7 +217,7 @@ impl GpxState {
 
         let mut bytes = Vec::new();
         gpx::write(&merged, &mut bytes)
-            .map_err(|err| format!("Failed to serialize GPX data: {err}"))?;
+            .map_err(|err| format!("Échec de la sérialisation des données GPX : {err}"))?;
 
         Ok(bytes)
     }
@@ -225,7 +226,7 @@ impl GpxState {
         self.gpx_documents.clear();
         self.track_visibility.clear();
         self.segment_visibility.clear();
-        self.status = Some("GPX overlays cleared".to_owned());
+        self.status = Some("Supprimer les GPX".to_owned());
         self.pending_gpx_fit = None;
         self.metadata_editor_open = false;
         self.selected_track_index = None;
@@ -528,13 +529,13 @@ impl GpxState {
 
         let mut open = self.tree_window_visible;
         let default_pos = ctx.available_rect().left_top() + egui::vec2(10., 200.0);
-        egui::Window::new("GPX Tree")
+        egui::Window::new("GPXs")
             .open(&mut open)
             .resizable(true)
             .default_pos(default_pos)
             .show(ctx, |ui| {
                 if self.gpx_documents.is_empty() {
-                    ui.label("No GPX loaded");
+                    ui.label("Pas de GPX chargé");
                     return;
                 }
 
@@ -553,7 +554,7 @@ impl GpxState {
                         });
                     if ui
                         .add(with_description_button)
-                        .on_hover_text("Filter SEGMENT_WITH_DESCRIPTION")
+                        .on_hover_text("Filtre segment avec description")
                         .clicked()
                     {
                         self.filter_with_description_color = !self.filter_with_description_color;
@@ -569,7 +570,7 @@ impl GpxState {
                         });
                     if ui
                         .add(to_explore_button)
-                        .on_hover_text("Filter SEGMENT_TO_EXPLORE")
+                        .on_hover_text("Filtre segment à explorer")
                         .clicked()
                     {
                         self.filter_to_explore_color = !self.filter_to_explore_color;
@@ -584,9 +585,7 @@ impl GpxState {
                         });
                     if ui
                         .add(no_button)
-                        .on_hover_text(
-                            "Filter segments with no color information and no description",
-                        )
+                        .on_hover_text("Filtre segments non a explorer et sans description")
                         .clicked()
                     {
                         self.filter_no_color_or_description = !self.filter_no_color_or_description;
@@ -633,7 +632,7 @@ impl GpxState {
                         }
 
                         let source = self.source_for_file(file_index);
-                        let file_label = format!("File: {source}");
+                        let file_label = format!("Fichier : {source}");
                         let file_is_open = builder.node(
                             NodeBuilder::dir(GpxTreeNodeId::File(file_index)).label_ui(|ui| {
                                 let row = ui.horizontal(|ui| {
@@ -869,14 +868,14 @@ impl GpxState {
         let mut track_description = self.track_description(track_selection).unwrap_or_default();
         let source = self.source_for_file(track_selection.file_index);
 
-        egui::Window::new("Track metadata")
+        egui::Window::new(format!("Trace {track_name}"))
             .open(&mut open)
             .resizable(true)
             .default_width(320.0)
             .show(ctx, |ui| {
                 ui.label(format!("Source: {source}"));
                 ui.separator();
-                ui.label("Name");
+                ui.label("Nom");
                 ui.text_edit_singleline(&mut track_name);
                 ui.label("Description");
                 ui.text_edit_multiline(&mut track_description);
@@ -916,16 +915,16 @@ impl GpxState {
 
         let track_name = self
             .track_name(track_selection)
-            .unwrap_or_else(|| "Unnamed".to_owned());
+            .unwrap_or_else(|| "Sans nom".to_owned());
         let mut segment_description = self.segment_description((track_selection, segment_index));
         let mut segment_comment = self.segment_comment((track_selection, segment_index));
 
-        let response = egui::Window::new("Segment metadata")
+        let response = egui::Window::new(format!("Segment {segment_index}"))
             .open(&mut open)
             .resizable(true)
             .default_width(320.0)
             .show(ctx, |ui| {
-                ui.label(format!("Track: {track_name}"));
+                ui.label(format!("Trace: {track_name}"));
                 ui.horizontal(|ui| {
                     let prev_enabled = segment_index > 0;
                     let next_enabled = segment_index + 1 < segment_count;
@@ -951,7 +950,7 @@ impl GpxState {
                     }
                 });
                 ui.separator();
-                ui.label("Color presets");
+                ui.label("Couleurs");
                 ui.horizontal(|ui| {
                     let button_size = egui::vec2(30.0, 20.0);
                     let selected_stroke = egui::Stroke::new(2.0, Color32::WHITE);
@@ -986,7 +985,7 @@ impl GpxState {
 
                     if ui
                         .add(with_description_button)
-                        .on_hover_text("SEGMENT_WITH_DESCRIPTION")
+                        .on_hover_text("segment avec description")
                         .clicked()
                     {
                         if with_description_selected {
@@ -998,7 +997,7 @@ impl GpxState {
 
                     if ui
                         .add(to_explore_button)
-                        .on_hover_text("SEGMENT_TO_EXPLORE")
+                        .on_hover_text("segment à explorer")
                         .clicked()
                     {
                         if to_explore_selected {
@@ -1084,7 +1083,7 @@ impl GpxState {
         bytes: &[u8],
     ) -> Result<(usize, Option<GpxBounds>), String> {
         let mut gpx = gpx::read(Cursor::new(bytes))
-            .map_err(|err| format!("Could not parse {file_name}: {err}"))?;
+            .map_err(|err| format!("Impossible de lire {file_name} : {err}"))?;
 
         let mut imported_segments = 0;
         let mut imported_bounds: Option<GpxBounds> = None;
@@ -1104,7 +1103,7 @@ impl GpxState {
         }
 
         if imported_segments == 0 {
-            return Err(format!("No drawable tracks found in {file_name}"));
+            return Err(format!("Aucune trace dessinable trouvée dans {file_name}"));
         }
 
         gpx.metadata
@@ -1130,11 +1129,11 @@ impl GpxState {
             self.toasts.error(message.clone());
             Some(message)
         } else if imported_segments > 0 {
-            let message = format!("Loaded {imported_segments} GPX segment(s)");
+            let message = format!("Chargé {imported_segments} segment(s) GPX");
             self.toasts.success(message.clone());
             Some(message)
         } else {
-            let message = "No GPX data imported".to_owned();
+            let message = "Aucune donnée GPX importée".to_owned();
             self.toasts.warning(message.clone());
             Some(message)
         };
@@ -1169,7 +1168,7 @@ impl GpxState {
                     .as_ref()
                     .and_then(|path| path.file_name())
                     .map(|name| name.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "dropped-file.gpx".to_owned())
+                    .unwrap_or_else(|| "new.gpx".to_owned())
             };
 
             let result = if let Some(bytes) = file.bytes.as_ref() {
@@ -1183,17 +1182,19 @@ impl GpxState {
                         .expect("file.path.is_some() checked above");
                     match std::fs::read(path) {
                         Ok(bytes) => self.load_gpx_from_bytes(&file_name, &bytes),
-                        Err(err) => Err(format!("Could not read {}: {err}", path.display())),
+                        Err(err) => Err(format!("Impossible de lire {} : {err}", path.display())),
                     }
                 }
                 #[cfg(target_arch = "wasm32")]
                 {
                     Err(format!(
-                        "Could not read {file_name}: file path access is unavailable"
+                        "Impossible de lire {file_name} : l'accès au chemin du fichier est indisponible"
                     ))
                 }
             } else {
-                Err(format!("Could not read {file_name}: missing file bytes"))
+                Err(format!(
+                    "Impossible de lire {file_name} : les octets du fichier sont manquants"
+                ))
             };
 
             match result {
@@ -1419,7 +1420,8 @@ impl GpxState {
         };
 
         if track_selection.kind != GpxTrackKind::Track {
-            self.status = Some("Cut is only supported for track segments".to_owned());
+            self.status =
+                Some("La découpe n'est prise en charge que pour les segments de trace".to_owned());
             return;
         }
 
@@ -1444,7 +1446,7 @@ impl GpxState {
         let mut second_waypoints = original_segment.points[split_idx..].to_vec();
 
         if first_waypoints.len() < 2 || second_waypoints.len() < 2 {
-            self.status = Some("Unable to cut segment at this position".to_owned());
+            self.status = Some("Impossible de découper le segment à cette position".to_owned());
             return;
         }
 
@@ -1467,8 +1469,8 @@ impl GpxState {
 
         self.selected_segment = Some((track_selection, segment_index + 1));
         self.segment_editor_open = true;
-        self.status = Some("Segment cut".to_owned());
-        self.toasts.success("Segment cut");
+        self.status = Some("Segment créé".to_owned());
+        self.toasts.success("Segment créé");
     }
 
     pub(crate) fn consume_remove_request(
@@ -1482,7 +1484,8 @@ impl GpxState {
         };
 
         if track_selection.kind != GpxTrackKind::Track {
-            self.status = Some("Merge is only supported for track segments".to_owned());
+            self.status =
+                Some("La fusion n'est prise en charge que pour les segments de trace".to_owned());
             return;
         }
 
@@ -1496,7 +1499,7 @@ impl GpxState {
 
         let segment_count = track.segments.len();
         if segment_count < 2 {
-            self.status = Some("No adjacent segment to merge".to_owned());
+            self.status = Some("Aucun segment à fusionner".to_owned());
             return;
         }
 
@@ -1544,8 +1547,8 @@ impl GpxState {
 
         self.selected_segment = Some((track_selection, left_idx));
         self.segment_editor_open = true;
-        self.status = Some("Segment removed".to_owned());
-        self.toasts.success("Segment removed");
+        self.status = Some("Segment supprimé".to_owned());
+        self.toasts.success("Segment supprimé");
     }
 }
 

@@ -86,9 +86,12 @@ impl MyApp {
         let data = match self.gpx_state.export_gpx_bytes() {
             Ok(data) => data,
             Err(error) => {
-                self.gpx_state
-                    .set_status_message(format!("Error preparing GPX save: {error}"));
-                log::error!("Error preparing GPX save: {error}");
+                self.gpx_state.set_status_message(format!(
+                    "Erreur dans la sauvegarde du fichier GPX : {error}"
+                ));
+                log::error!(
+                    "Erreur lors de la préparation de la sauvegarde du fichier GPX : {error}"
+                );
                 return;
             }
         };
@@ -107,13 +110,14 @@ impl MyApp {
             match save_result {
                 Ok(file_name) => {
                     self.gpx_state
-                        .set_status_message(format!("GPX saved: {file_name}"));
-                    log::info!("GPX file saved successfully: {file_name}");
+                        .set_status_message(format!("GPX sauvegardé : {file_name}"));
+                    log::info!("Fichier GPX sauvegardé avec succès : {file_name}");
                 }
                 Err(error) => {
-                    self.gpx_state
-                        .set_status_message(format!("Error saving GPX file: {error}"));
-                    log::error!("Error saving GPX file: {error}");
+                    self.gpx_state.set_status_message(format!(
+                        "Erreur lors de la sauvegarde du fichier GPX : {error}"
+                    ));
+                    log::error!("Erreur lors de la sauvegarde du fichier GPX : {error}");
                 }
             }
         }

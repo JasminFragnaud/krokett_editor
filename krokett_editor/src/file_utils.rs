@@ -20,7 +20,7 @@ pub fn load_file(sender: Sender<FileContent>) {
             data: file.read().await,
         };
         if let Err(e) = sender.send(content) {
-            log::error!("Error sending file content on channel: {e}");
+            log::error!("Erreur lors de l'envoi du contenu du fichier sur le canal : {e}");
         }
     });
 }
@@ -33,10 +33,10 @@ pub fn save_as(content: FileContent, sender: Sender<Result<FileName>>) {
         let Some(file) = task.await else { return };
         let file_name = match file.write(&content.data).await {
             Ok(()) => Ok(file.file_name()),
-            Err(e) => Err(anyhow!("Error saving file: {e}")),
+            Err(e) => Err(anyhow!("Erreur lors de la sauvegarde du fichier : {e}")),
         };
         if let Err(e) = sender.send(file_name) {
-            log::error!("Error sending file name on channel: {e}");
+            log::error!("Erreur lors de l'envoi du nom du fichier sur le canal : {e}");
         }
     });
 }
