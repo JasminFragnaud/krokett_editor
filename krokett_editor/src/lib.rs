@@ -14,13 +14,22 @@ use std::{
 };
 
 use crate::{
-    file_utils::{FileContent, FileName, save_as},
+    file_utils::{FileContent, FileName},
     windows::{clear_gpx_confirmation_modal, cut_tool_controls, map_selector, zoom},
 };
 use anyhow::Result;
 use egui::{CentralPanel, Context, Frame, Theme, TopBottomPanel, Visuals};
+#[cfg(target_os = "android")]
+use egui_file_dialog::FileDialog;
 use tiles::{Provider, TilesKind, providers};
 use walkers::{Map, MapMemory};
+
+#[cfg(target_os = "android")]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AndroidFileDialogAction {
+    Load,
+    Save,
+}
 
 pub struct MyApp {
     providers: BTreeMap<Provider, Vec<TilesKind>>,
@@ -31,6 +40,12 @@ pub struct MyApp {
     clear_gpx_confirm_open: bool,
     load_gpx_channel: (Sender<FileContent>, Receiver<FileContent>),
     save_gpx_channel: (Sender<Result<FileName>>, Receiver<Result<FileName>>),
+    #[cfg(target_os = "android")]
+    file_dialog: FileDialog,
+    #[cfg(target_os = "android")]
+    android_file_dialog_action: Option<AndroidFileDialogAction>,
+    #[cfg(target_os = "android")]
+    android_pending_save_content: Option<FileContent>,
 }
 
 impl MyApp {
@@ -55,6 +70,12 @@ impl MyApp {
             load_gpx_channel: (std::sync::mpsc::channel()),
             save_gpx_channel: (std::sync::mpsc::channel()),
             clear_gpx_confirm_open: false,
+            #[cfg(target_os = "android")]
+            file_dialog: FileDialog::new().as_modal(true),
+            #[cfg(target_os = "android")]
+            android_file_dialog_action: None,
+            #[cfg(target_os = "android")]
+            android_pending_save_content: None,
         }
     }
 
@@ -96,13 +117,56 @@ impl MyApp {
             }
         };
 
-        save_as(
-            FileContent {
-                name: self.gpx_state.export_file_name(),
-                data,
-            },
-            self.save_gpx_channel.0.clone(),
-        );
+        let content = FileContent {
+            name: self.gpx_state.export_file_name(),
+            data,
+        };
+
+        #[cfg(not(target_os = "android"))]
+        {
+            file_utils::save_as(content, self.save_gpx_channel.0.clone());
+        }
+
+        #[cfg(target_os = "android")]
+        {
+            self.android_pending_save_content = Some(content);
+            self.android_file_dialog_action = Some(AndroidFileDialogAction::Save);
+            self.file_dialog.save_file();
+        }
+    }
+
+    pub(crate) fn request_load_gpx_from_disk(&mut self) {
+        #[cfg(not(target_os = "android"))]
+        {
+            file_utils::load_file(self.load_gpx_channel.0.clone());
+        }
+
+        #[cfg(target_os = "android")]
+        {
+            self.android_file_dialog_action = Some(AndroidFileDialogAction::Load);
+            self.file_dialog.pick_file();
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    fn handle_android_file_dialog(&mut self, ctx: &egui::Context) {
+        self.file_dialog.update(ctx);
+
+        let Some(path) = self.file_dialog.take_picked() else {
+            return;
+        };
+
+        match self.android_file_dialog_action.take() {
+            Some(AndroidFileDialogAction::Load) => {
+                file_utils::load_file_from_path(path, self.load_gpx_channel.0.clone());
+            }
+            Some(AndroidFileDialogAction::Save) => {
+                if let Some(content) = self.android_pending_save_content.take() {
+                    file_utils::save_as_to_path(path, content, self.save_gpx_channel.0.clone());
+                }
+            }
+            None => {}
+        }
     }
 
     pub(crate) fn handle_save_gpx_result(&mut self) {
@@ -126,6 +190,9 @@ impl MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        #[cfg(target_os = "android")]
+        self.handle_android_file_dialog(ctx);
+
         self.load_gpx_from_disk(ctx);
         self.handle_save_gpx_result();
 

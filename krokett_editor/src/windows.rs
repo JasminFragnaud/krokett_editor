@@ -1,4 +1,4 @@
-use crate::{MyApp, file_utils::load_file, toggle_switch};
+use crate::{MyApp, toggle_switch};
 use egui::{Align, Align2, ComboBox, Image, Layout, Response, RichText, Ui, Vec2, Window};
 use walkers::{MapMemory, sources::Attribution};
 
@@ -7,7 +7,7 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.menu_button("Fichier", |ui| {
                 if ui.button("Charger GPX…").clicked() {
-                    load_file(app.load_gpx_channel.0.clone());
+                    app.request_load_gpx_from_disk();
                     ui.close();
                 }
 

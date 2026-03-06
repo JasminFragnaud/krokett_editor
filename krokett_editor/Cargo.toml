@@ -15,9 +15,14 @@ egui_ltreeview = "0.6.1"
 egui-notify = "0.21.0"
 itertools = "0.14.0"
 gpx = "0.10"
-rfd = "0.17.2"
 anyhow = "1.0.102"
 futures = "0.3.32"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4.64"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+rfd = "0.17.2"
+
+[target.'cfg(target_os = "android")'.dependencies]
+egui-file-dialog = "0.12.0"
