@@ -29,6 +29,7 @@ impl GpxState {
         egui::Window::new("GPXs")
             .open(&mut open)
             .resizable(true)
+            .hscroll(true)
             .vscroll(true)
             .default_pos(default_pos)
             .show(ctx, |ui| {

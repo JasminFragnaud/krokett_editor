@@ -1,11 +1,11 @@
+mod editing;
 mod editors;
 mod import_io;
 mod plugins;
+mod polyline;
 mod segments;
 mod tracks;
 mod tree;
-mod polyline;
-mod editing;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};

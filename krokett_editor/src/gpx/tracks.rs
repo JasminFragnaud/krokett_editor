@@ -145,7 +145,11 @@ impl GpxState {
             .unwrap_or(true)
     }
 
-    pub(super) fn set_segment_visible(&mut self, segment_selection: SegmentSelection, visible: bool) {
+    pub(super) fn set_segment_visible(
+        &mut self,
+        segment_selection: SegmentSelection,
+        visible: bool,
+    ) {
         self.segment_visibility.insert(segment_selection, visible);
     }
 }

@@ -5,18 +5,18 @@ use walkers::{MapMemory, sources::Attribution};
 pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
     egui::MenuBar::new().ui(ui, |ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            ui.menu_button("File", |ui| {
-                if ui.button("Load GPX…").clicked() {
+            ui.menu_button("Fichier", |ui| {
+                if ui.button("Charger GPX…").clicked() {
                     load_file(app.load_gpx_channel.0.clone());
                     ui.close();
                 }
 
-                if ui.button("Save GPX…").clicked() {
+                if ui.button("Sauver GPX…").clicked() {
                     app.save_gpx_to_disk();
                     ui.close();
                 }
 
-                if app.gpx_state.tracks_count() > 0 && ui.button("Remove GPXs").clicked() {
+                if app.gpx_state.tracks_count() > 0 && ui.button("Supprimer GPXs").clicked() {
                     if app.gpx_state.tracks_count() > 0 {
                         app.clear_gpx_confirm_open = true;
                     }
@@ -24,12 +24,18 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
                 }
 
                 let mut auto_fit = app.gpx_state.auto_fit_enabled();
-                if ui.checkbox(&mut auto_fit, "Auto-fit GPX on load").changed() {
+                if ui
+                    .checkbox(&mut auto_fit, "Auto-zoom chargement GPX")
+                    .changed()
+                {
                     app.gpx_state.set_auto_fit_enabled(auto_fit);
                 }
 
                 let mut show_tree = app.gpx_state.tree_window_visible();
-                if ui.checkbox(&mut show_tree, "Show GPX tree").changed() {
+                if ui
+                    .checkbox(&mut show_tree, "Afficher l'arbre GPX")
+                    .changed()
+                {
                     app.gpx_state.set_tree_window_visible(show_tree);
                 }
             });
@@ -49,14 +55,14 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
 }
 
 pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
-    Window::new("Map Selector")
+    Window::new("Sélecteur de carte")
         .collapsible(true)
         .resizable(true)
-        .default_size(Vec2 { x: 50., y: 50. })
+        .min_size(Vec2 { x: 200., y: 50. })
         .title_bar(false)
         .anchor(Align2::LEFT_TOP, [10., 44.])
         .show(ui.ctx(), |ui| {
-            ComboBox::from_id_salt("Tile Provider")
+            ComboBox::from_id_salt("Source Carte")
                 .selected_text(format!("{:?}", app.selected_provider))
                 .show_ui(ui, |ui| {
                     for p in app.providers.keys() {
@@ -74,12 +80,12 @@ pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
             }
 
             ui.separator();
-            ui.label("Drop .gpx files on the map to display tracks");
-            ui.label(format!("GPX segments: {}", app.gpx_state.tracks_count()));
+            ui.label("Déposez des fichiers .gpx sur la carte pour afficher les traces");
+            ui.label(format!("Segments GPX : {}", app.gpx_state.tracks_count()));
 
             if app.gpx_state.cut_tool_enabled() {
                 ui.label(
-                    "Cut tool enabled — Left click: cut, Right click separator: merge adjacent",
+                    "Édition de segment activé:\nClic gauche : créer un nouveau segment,\nClic droit sur un séparateur : supprimer le segment",
                 );
             }
 
@@ -99,16 +105,16 @@ pub fn clear_gpx_confirmation_modal(app: &mut MyApp, ctx: &egui::Context) {
     let modal_response =
         egui::Modal::new(egui::Id::new("clear_gpx_confirmation")).show(ctx, |ui| {
             ui.set_min_width(320.0);
-            ui.heading("Clear all GPX overlays?");
+            ui.heading("Supprimer tous les GPX ?");
             ui.add_space(4.0);
-            ui.label("This action removes all loaded GPX tracks from the map.");
+            ui.label("Cette action supprimera toutes les GPX chargées de la carte.");
             ui.add_space(10.0);
             ui.horizontal(|ui| {
                 if ui.button("Ok").clicked() {
                     confirm = true;
                     ui.close();
                 }
-                if ui.button("Cancel").clicked() {
+                if ui.button("Annuler").clicked() {
                     ui.close();
                 }
             });
@@ -127,14 +133,14 @@ pub fn large_material_button(ui: &mut Ui, text: &str) -> Response {
 }
 
 pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
-    Window::new("Cut Tool")
+    Window::new("Découpe segments")
         .collapsible(false)
         .resizable(false)
         .title_bar(false)
         .anchor(Align2::RIGHT_TOP, [-10., 44.])
         .show(ui.ctx(), |ui| {
             let mut cut_tool = app.gpx_state.cut_tool_enabled();
-            if ui.checkbox(&mut cut_tool, "Segment edit").changed() {
+            if ui.checkbox(&mut cut_tool, "Édition de segment").changed() {
                 app.gpx_state.set_cut_tool_enabled(cut_tool);
             }
         });
@@ -142,7 +148,7 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
 
 /// Simple GUI to zoom in and out.
 pub fn zoom(ui: &Ui, map_memory: &mut MapMemory) {
-    Window::new("Map")
+    Window::new("Carte")
         .collapsible(false)
         .resizable(false)
         .title_bar(false)

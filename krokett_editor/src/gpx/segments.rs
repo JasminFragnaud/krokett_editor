@@ -21,7 +21,10 @@ impl GpxState {
             || (self.filter_no_color_or_description && no_color_or_description)
     }
 
-    pub(super) fn segment_waypoints(&self, selection: SegmentSelection) -> Option<&[gpx::Waypoint]> {
+    pub(super) fn segment_waypoints(
+        &self,
+        selection: SegmentSelection,
+    ) -> Option<&[gpx::Waypoint]> {
         let (track_selection, segment_index) = selection;
         match track_selection.kind {
             GpxTrackKind::Track => self
@@ -73,7 +76,11 @@ impl GpxState {
             .unwrap_or_default()
     }
 
-    pub(super) fn set_segment_description(&mut self, selection: SegmentSelection, description: String) {
+    pub(super) fn set_segment_description(
+        &mut self,
+        selection: SegmentSelection,
+        description: String,
+    ) {
         if let Some(waypoints) = self.segment_waypoints_mut(selection) {
             if let Some(first) = waypoints.first_mut() {
                 first.description = if description.trim().is_empty() {
