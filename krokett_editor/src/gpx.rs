@@ -532,6 +532,7 @@ impl GpxState {
         egui::Window::new("GPXs")
             .open(&mut open)
             .resizable(true)
+            .vscroll(true)
             .default_pos(default_pos)
             .show(ctx, |ui| {
                 if self.gpx_documents.is_empty() {
