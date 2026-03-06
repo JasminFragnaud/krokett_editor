@@ -50,7 +50,10 @@ pub fn load_file_from_path(path: PathBuf, sender: Sender<FileContent>) {
                 }
             }
             Err(e) => {
-                log::error!("Erreur lors du chargement du fichier GPX {} : {e}", path.display());
+                log::error!(
+                    "Erreur lors du chargement du fichier GPX {} : {e}",
+                    path.display()
+                );
             }
         }
     });
