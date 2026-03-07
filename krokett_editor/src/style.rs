@@ -55,7 +55,7 @@ pub fn amoled_friendly() -> Style {
         text_styles: text_styles(),
         visuals: Visuals {
             dark_mode: true,
-            override_text_color: None,
+            override_text_color: Some(Color32::WHITE),
             widgets,
             selection: Selection::default(),
             hyperlink_color: Color32::from_gray(200),

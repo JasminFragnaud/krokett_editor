@@ -36,6 +36,12 @@ pub struct MyApp {
 }
 
 impl MyApp {
+    fn light_visuals_with_black_text() -> Visuals {
+        let mut visuals = Visuals::light();
+        visuals.override_text_color = Some(egui::Color32::BLACK);
+        visuals
+    }
+
     pub fn new(egui_ctx: Context) -> Self {
         let dark_mode = egui_ctx
             .system_theme()
@@ -44,7 +50,7 @@ impl MyApp {
         if dark_mode {
             egui_ctx.set_style(style::amoled_friendly());
         } else {
-            egui_ctx.set_visuals(Visuals::light());
+            egui_ctx.set_visuals(Self::light_visuals_with_black_text());
         }
         egui_material_icons::initialize(&egui_ctx);
 
@@ -69,7 +75,7 @@ impl MyApp {
         if dark_mode {
             ctx.set_style(style::amoled_friendly());
         } else {
-            ctx.set_visuals(Visuals::light());
+            ctx.set_visuals(Self::light_visuals_with_black_text());
         }
     }
 
