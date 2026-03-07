@@ -63,7 +63,6 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
-    if: false # Android build is currently disabled
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
@@ -81,7 +80,7 @@ jobs:
       run: make apk
     - uses: actions/upload-artifact@v4
       with:
-        name: krokett_editor-android.apk
+        name: krokett_editor_android_${{ github.ref_name }}.apk
         path: krokett_editor_android/java/app/build/outputs/apk/release/app-release-unsigned.apk
 
   tests-lints:
