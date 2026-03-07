@@ -59,7 +59,7 @@ pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
         .collapsible(true)
         .resizable(true)
         .min_size(Vec2 { x: 200., y: 50. })
-        .title_bar(false)
+        .title_bar(true)
         .anchor(Align2::LEFT_TOP, [10., 44.])
         .show(ui.ctx(), |ui| {
             ComboBox::from_id_salt("Source Carte")
