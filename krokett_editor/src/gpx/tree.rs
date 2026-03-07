@@ -1,4 +1,3 @@
-use crate::constants::WINDOW_WIDTH;
 
 use super::*;
 
