@@ -1,3 +1,5 @@
+use crate::constants::WINDOW_WIDTH;
+
 use super::*;
 
 use egui::Color32;
@@ -28,6 +30,7 @@ impl GpxState {
         let default_pos = ctx.available_rect().left_top() + egui::vec2(10., 200.0);
         egui::Window::new("GPXs")
             .open(&mut open)
+            .default_open(false)
             .resizable(true)
             .hscroll(true)
             .vscroll(true)

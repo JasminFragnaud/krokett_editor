@@ -3,6 +3,7 @@ use egui::Color32;
 pub struct Colors;
 
 pub const GPX_EXTENSION: &str = ".gpx";
+pub const WINDOW_WIDTH: f32 = 100.;
 
 impl Colors {
     pub const SEGMENT_HOOVER: Color32 = Color32::from_rgb(14, 214, 85);

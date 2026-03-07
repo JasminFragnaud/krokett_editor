@@ -1,4 +1,4 @@
-use crate::{MyApp, toggle_switch};
+use crate::{MyApp, constants::WINDOW_WIDTH, toggle_switch};
 use egui::{Align, Align2, ComboBox, Image, Layout, Response, RichText, Ui, Vec2, Window};
 use walkers::{MapMemory, sources::Attribution};
 
@@ -57,8 +57,9 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
 pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
     Window::new("Sélecteur de carte")
         .collapsible(true)
+        .default_open(false)
         .resizable(true)
-        .min_size(Vec2 { x: 200., y: 50. })
+        .default_size(Vec2 { x: WINDOW_WIDTH, y: 50. })
         .title_bar(true)
         .anchor(Align2::LEFT_TOP, [10., 44.])
         .show(ui.ctx(), |ui| {
