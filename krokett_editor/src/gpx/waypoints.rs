@@ -16,8 +16,10 @@ fn ensure_marker_document(documents: &mut Vec<gpx::Gpx>) -> usize {
 
 impl GpxState {
     pub(crate) fn consume_waypoint_click(&mut self, clicked_waypoint: ClickedWaypoint) {
-        if let Some(waypoint_selection) =
-            clicked_waypoint.lock().ok().and_then(|mut lock| lock.take())
+        if let Some(waypoint_selection) = clicked_waypoint
+            .lock()
+            .ok()
+            .and_then(|mut lock| lock.take())
         {
             self.selected_waypoint = Some(waypoint_selection);
             self.waypoint_editor_open = true;
@@ -32,7 +34,11 @@ impl GpxState {
             return;
         }
 
-        let Some(position) = add_waypoint_request.lock().ok().and_then(|mut lock| lock.take()) else {
+        let Some(position) = add_waypoint_request
+            .lock()
+            .ok()
+            .and_then(|mut lock| lock.take())
+        else {
             return;
         };
 
@@ -112,13 +118,10 @@ impl GpxState {
                 ui.horizontal(|ui| {
                     ui.label(format!("Source: {source}"));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let delete_button = egui::Button::new(egui::RichText::new("\u{e872}").size(18.0))
-                            .min_size(egui::vec2(28.0, 28.0));
-                        if ui
-                            .add(delete_button)
-                            .on_hover_text("Supprimer")
-                            .clicked()
-                        {
+                        let delete_button =
+                            egui::Button::new(egui::RichText::new("\u{e872}").size(18.0))
+                                .min_size(egui::vec2(28.0, 28.0));
+                        if ui.add(delete_button).on_hover_text("Supprimer").clicked() {
                             ask_delete = true;
                         }
                     });
@@ -127,12 +130,10 @@ impl GpxState {
                     let prev_enabled = waypoint_index > 0;
                     let next_enabled = waypoint_index + 1 < waypoint_count;
 
-                    let prev_button =
-                        egui::Button::new(egui::RichText::new("\u{e909}").size(18.0))
-                            .min_size(egui::vec2(26.0, 24.0));
-                    let next_button =
-                        egui::Button::new(egui::RichText::new("\u{e146}").size(18.0))
-                            .min_size(egui::vec2(26.0, 24.0));
+                    let prev_button = egui::Button::new(egui::RichText::new("\u{e909}").size(18.0))
+                        .min_size(egui::vec2(26.0, 24.0));
+                    let next_button = egui::Button::new(egui::RichText::new("\u{e146}").size(18.0))
+                        .min_size(egui::vec2(26.0, 24.0));
 
                     if ui
                         .add_enabled(prev_enabled, prev_button)
@@ -142,7 +143,11 @@ impl GpxState {
                         go_previous = true;
                     }
 
-                    ui.label(format!("Waypoint: {} / {}", waypoint_index + 1, waypoint_count));
+                    ui.label(format!(
+                        "Waypoint: {} / {}",
+                        waypoint_index + 1,
+                        waypoint_count
+                    ));
 
                     if ui
                         .add_enabled(next_enabled, next_button)
@@ -175,8 +180,8 @@ impl GpxState {
         }
 
         if self.waypoint_delete_confirm_open {
-            let modal_response =
-                egui::Modal::new(egui::Id::new("delete_waypoint_confirmation")).show(ctx, |ui| {
+            let modal_response = egui::Modal::new(egui::Id::new("delete_waypoint_confirmation"))
+                .show(ctx, |ui| {
                     ui.set_min_width(320.0);
                     ui.heading("Supprimer ce waypoint ?");
                     ui.add_space(4.0);

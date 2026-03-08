@@ -89,8 +89,8 @@ impl Plugin for GpxWaypointMarkers {
 
         for (selection, position, _) in &self.waypoints {
             let tip = projector.project(*position).to_pos2();
-            let highlighted = hovered == Some(*selection)
-                || self.window_highlight_waypoint == Some(*selection);
+            let highlighted =
+                hovered == Some(*selection) || self.window_highlight_waypoint == Some(*selection);
             draw_pin(ui.painter(), tip, highlighted);
         }
 
@@ -102,7 +102,8 @@ impl Plugin for GpxWaypointMarkers {
             {
                 if !description.trim().is_empty() {
                     let tip = projector.project(*position).to_pos2();
-                    let tooltip_pos = pin_body_center(tip) + egui::vec2(0.0, -PIN_BODY_RADIUS - 4.0);
+                    let tooltip_pos =
+                        pin_body_center(tip) + egui::vec2(0.0, -PIN_BODY_RADIUS - 4.0);
                     let tooltip_id = egui::Id::new(("waypoint_desc", hovered_selection));
                     let mut tooltip = egui::Tooltip::always_open(
                         ui.ctx().clone(),
@@ -124,7 +125,8 @@ impl Plugin for GpxWaypointMarkers {
                 return;
             };
 
-            if let Some((selection, _)) = nearest_waypoint(pointer_pos, &self.waypoints, projector) {
+            if let Some((selection, _)) = nearest_waypoint(pointer_pos, &self.waypoints, projector)
+            {
                 if let Ok(mut clicked_waypoint) = self.clicked_waypoint.lock() {
                     *clicked_waypoint = Some(selection);
                 }

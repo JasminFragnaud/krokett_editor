@@ -81,12 +81,10 @@ impl GpxState {
                     let prev_enabled = segment_index > 0;
                     let next_enabled = segment_index + 1 < segment_count;
 
-                    let prev_button =
-                        egui::Button::new(egui::RichText::new("\u{e909}").size(18.0))
-                            .min_size(egui::vec2(26.0, 24.0));
-                    let next_button =
-                        egui::Button::new(egui::RichText::new("\u{e146}").size(18.0))
-                            .min_size(egui::vec2(26.0, 24.0));
+                    let prev_button = egui::Button::new(egui::RichText::new("\u{e909}").size(18.0))
+                        .min_size(egui::vec2(26.0, 24.0));
+                    let next_button = egui::Button::new(egui::RichText::new("\u{e146}").size(18.0))
+                        .min_size(egui::vec2(26.0, 24.0));
 
                     if ui
                         .add_enabled(prev_enabled, prev_button)
