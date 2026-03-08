@@ -65,6 +65,19 @@ impl GpxState {
             }
         }
 
+        for waypoint in &gpx.waypoints {
+            let waypoint_bounds = GpxBounds::from_position(walkers::lat_lon(
+                waypoint.point().y(),
+                waypoint.point().x(),
+            ));
+            if let Some(existing) = imported_bounds.as_mut() {
+                existing.merge(waypoint_bounds);
+            } else {
+                imported_bounds = Some(waypoint_bounds);
+            }
+            imported_segments += 1;
+        }
+
         if imported_segments == 0 {
             return Err(format!("Aucune trace dessinable trouvée dans {file_name}"));
         }

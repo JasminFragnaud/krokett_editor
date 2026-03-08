@@ -90,6 +90,12 @@ pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
                 );
             }
 
+            if app.gpx_state.waypoint_tool_enabled() {
+                ui.label(
+                    "Édition de waypoint activé:\nClic gauche sur la carte : ajouter un waypoint,\nClic gauche sur un waypoint : éditer sa description",
+                );
+            }
+
             if let Some(status) = app.gpx_state.status() {
                 ui.label(status);
             }
@@ -143,6 +149,14 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
             let mut cut_tool = app.gpx_state.cut_tool_enabled();
             if ui.checkbox(&mut cut_tool, "Édition de segment").changed() {
                 app.gpx_state.set_cut_tool_enabled(cut_tool);
+            }
+
+            let mut waypoint_tool = app.gpx_state.waypoint_tool_enabled();
+            if ui
+                .checkbox(&mut waypoint_tool, "Édition de waypoint")
+                .changed()
+            {
+                app.gpx_state.set_waypoint_tool_enabled(waypoint_tool);
             }
         });
 }

@@ -215,6 +215,18 @@ impl Plugin for GpxPolyline {
 
         if response.clicked_by(PointerButton::Secondary) {
             if let Some(pointer_pos) = response.interact_pointer_pos() {
+                if !self.cut_tool_enabled
+                    && pointer_hits_polyline(pointer_pos, &self.positions, projector)
+                {
+                    if let Ok(mut clicked) = self.clicked_track.lock() {
+                        *clicked = Some(self.track_selection);
+                    }
+                }
+            }
+        }
+
+        if response.clicked_by(PointerButton::Primary) {
+            if let Some(pointer_pos) = response.interact_pointer_pos() {
                 if self.cut_tool_enabled {
                     if let Some(left_index) = merge_left_index_from_separator_click(
                         pointer_pos,
@@ -227,19 +239,7 @@ impl Plugin for GpxPolyline {
                         if let Ok(mut remove) = self.remove_request.lock() {
                             *remove = Some((self.track_selection, left_index));
                         }
-                    }
-                } else if pointer_hits_polyline(pointer_pos, &self.positions, projector) {
-                    if let Ok(mut clicked) = self.clicked_track.lock() {
-                        *clicked = Some(self.track_selection);
-                    }
-                }
-            }
-        }
-
-        if response.clicked_by(PointerButton::Primary) {
-            if let Some(pointer_pos) = response.interact_pointer_pos() {
-                if pointer_hits_polyline(pointer_pos, &self.positions, projector) {
-                    if self.cut_tool_enabled {
+                    } else if pointer_hits_polyline(pointer_pos, &self.positions, projector) {
                         if let Some(split_idx) =
                             nearest_segment_split_index(pointer_pos, &self.positions, projector)
                         {
@@ -247,7 +247,9 @@ impl Plugin for GpxPolyline {
                                 *cut = Some((self.track_selection, self.segment_index, split_idx));
                             }
                         }
-                    } else if let Ok(mut clicked) = self.clicked_segment.lock() {
+                    }
+                } else if pointer_hits_polyline(pointer_pos, &self.positions, projector) {
+                    if let Ok(mut clicked) = self.clicked_segment.lock() {
                         *clicked = Some((self.track_selection, self.segment_index));
                     }
                 }

@@ -6,6 +6,8 @@ mod polyline;
 mod segments;
 mod tracks;
 mod tree;
+mod waypoint_markers;
+mod waypoints;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -69,18 +71,24 @@ impl GpxBounds {
 }
 
 type SegmentSelection = (TrackSelection, usize);
+type WaypointSelection = (usize, usize);
 type CutRequest = (TrackSelection, usize, usize);
 type MergeRequest = (TrackSelection, usize);
+type AddWaypointRequest = walkers::Position;
 type ClickedTrack = Arc<Mutex<Option<TrackSelection>>>;
 type ClickedSegment = Arc<Mutex<Option<SegmentSelection>>>;
+type ClickedWaypoint = Arc<Mutex<Option<WaypointSelection>>>;
 type PendingCutRequest = Arc<Mutex<Option<CutRequest>>>;
 type PendingMergeRequest = Arc<Mutex<Option<MergeRequest>>>;
+type PendingAddWaypointRequest = Arc<Mutex<Option<AddWaypointRequest>>>;
 type AddPluginsOutput<'a, 'b, 'c> = (
     Map<'a, 'b, 'c>,
     ClickedTrack,
     ClickedSegment,
+    ClickedWaypoint,
     PendingCutRequest,
     PendingMergeRequest,
+    PendingAddWaypointRequest,
 );
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -107,9 +115,14 @@ pub(crate) struct GpxState {
     tree_hover_track: Option<TrackSelection>,
     tree_hover_segment: Option<SegmentSelection>,
     cut_tool_enabled: bool,
+    waypoint_tool_enabled: bool,
     filter_with_description_color: bool,
     filter_to_explore_color: bool,
     filter_no_color_or_description: bool,
+    waypoint_editor_open: bool,
+    selected_waypoint: Option<WaypointSelection>,
+    window_highlight_waypoint: Option<WaypointSelection>,
+    waypoint_delete_confirm_open: bool,
 }
 
 impl GpxState {
@@ -131,9 +144,14 @@ impl GpxState {
             tree_hover_track: None,
             tree_hover_segment: None,
             cut_tool_enabled: false,
+            waypoint_tool_enabled: false,
             filter_with_description_color: false,
             filter_to_explore_color: false,
             filter_no_color_or_description: false,
+            waypoint_editor_open: false,
+            selected_waypoint: None,
+            window_highlight_waypoint: None,
+            waypoint_delete_confirm_open: false,
         }
     }
 
@@ -207,6 +225,10 @@ impl GpxState {
         self.window_highlight_segment = None;
         self.tree_hover_track = None;
         self.tree_hover_segment = None;
+        self.waypoint_editor_open = false;
+        self.selected_waypoint = None;
+        self.window_highlight_waypoint = None;
+        self.waypoint_delete_confirm_open = false;
     }
 
     pub(crate) fn show_toast(&mut self, ctx: &egui::Context) {
@@ -227,5 +249,26 @@ impl GpxState {
 
     pub(crate) fn set_cut_tool_enabled(&mut self, enabled: bool) {
         self.cut_tool_enabled = enabled;
+        if enabled {
+            self.waypoint_tool_enabled = false;
+        }
+    }
+
+    pub(crate) fn waypoint_tool_enabled(&self) -> bool {
+        self.waypoint_tool_enabled
+    }
+
+    pub(crate) fn set_waypoint_tool_enabled(&mut self, enabled: bool) {
+        self.waypoint_tool_enabled = enabled;
+        if enabled {
+            self.cut_tool_enabled = false;
+        }
+
+        if !enabled {
+            self.waypoint_editor_open = false;
+            self.selected_waypoint = None;
+            self.window_highlight_waypoint = None;
+            self.waypoint_delete_confirm_open = false;
+        }
     }
 }

@@ -1,4 +1,5 @@
 use crate::gpx::polyline::GpxPolyline;
+use crate::gpx::waypoint_markers::GpxWaypointMarkers;
 
 use super::*;
 
@@ -15,10 +16,21 @@ impl GpxState {
     {
         let clicked_track = Arc::new(Mutex::new(None));
         let clicked_segment = Arc::new(Mutex::new(None));
+        let clicked_waypoint = Arc::new(Mutex::new(None));
         let cut_request = Arc::new(Mutex::new(None));
         let remove_request = Arc::new(Mutex::new(None));
+        let add_waypoint_request = Arc::new(Mutex::new(None));
+
+        let mut map_waypoints: Vec<(WaypointSelection, walkers::Position, String)> = Vec::new();
 
         for (file_index, document) in self.gpx_documents.iter().enumerate() {
+            for (waypoint_index, waypoint) in document.waypoints.iter().enumerate() {
+                let point = waypoint.point();
+                let position = walkers::lat_lon(point.y(), point.x());
+                let description = waypoint.description.clone().unwrap_or_default();
+                map_waypoints.push(((file_index, waypoint_index), position, description));
+            }
+
             for (track_index, track) in document.tracks.iter().enumerate() {
                 let track_selection = TrackSelection {
                     file_index,
@@ -136,12 +148,22 @@ impl GpxState {
             }
         }
 
+        map = map.with_plugin(GpxWaypointMarkers {
+            waypoints: map_waypoints,
+            waypoint_tool_enabled: self.waypoint_tool_enabled,
+            window_highlight_waypoint: self.window_highlight_waypoint,
+            clicked_waypoint: clicked_waypoint.clone(),
+            add_waypoint_request: add_waypoint_request.clone(),
+        });
+
         (
             map,
             clicked_track,
             clicked_segment,
+            clicked_waypoint,
             cut_request,
             remove_request,
+            add_waypoint_request,
         )
     }
 }

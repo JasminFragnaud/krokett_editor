@@ -230,8 +230,15 @@ impl eframe::App for MyApp {
 
             let mut map = Map::new(None, &mut self.map_memory, my_position).zoom_with_ctrl(false);
 
-            let (map_with_plugins, clicked_track, clicked_segment, cut_request, remove_request) =
-                self.gpx_state.add_plugins(map);
+            let (
+                map_with_plugins,
+                clicked_track,
+                clicked_segment,
+                clicked_waypoint,
+                cut_request,
+                remove_request,
+                add_waypoint_request,
+            ) = self.gpx_state.add_plugins(map);
             map = map_with_plugins;
 
             for (n, tiles) in tiles.iter_mut().enumerate() {
@@ -242,8 +249,11 @@ impl eframe::App for MyApp {
             ui.add(map);
             self.gpx_state.consume_track_click(clicked_track);
             self.gpx_state.consume_segment_click(clicked_segment);
+            self.gpx_state.consume_waypoint_click(clicked_waypoint);
             self.gpx_state.consume_cut_request(cut_request);
             self.gpx_state.consume_remove_request(remove_request);
+            self.gpx_state
+                .consume_add_waypoint_request(add_waypoint_request);
 
             {
                 cut_tool_controls(self, ui);
@@ -254,6 +264,7 @@ impl eframe::App for MyApp {
 
         self.gpx_state.show_metadata_editor_window(ctx);
         self.gpx_state.show_segment_editor_window(ctx);
+        self.gpx_state.show_waypoint_editor_window(ctx);
         clear_gpx_confirmation_modal(self, ctx);
         self.gpx_state.show_toast(ctx);
     }
