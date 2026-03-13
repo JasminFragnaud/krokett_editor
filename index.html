@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<head>
+    <title>Walkers</title>
+
+    <style>
+        /* Allow canvas to fill entire web page: */
+        html,
+        body {
+            overflow: hidden;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Position canvas in center-top: */
+        canvas {
+            margin-right: auto;
+            margin-left: auto;
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+<link rel="modulepreload" href="./krokett_editor_web-93faaa392d5a4963.js" crossorigin="anonymous" integrity="sha384-5UNkMYeed4YKJ2yoVMoSd12hVNVmBf9hYnQmidubimloXuihj+zE9fr375pP+AqQ"><link rel="preload" href="./krokett_editor_web-93faaa392d5a4963_bg.wasm" crossorigin="anonymous" integrity="sha384-qZ26VmkmogCsYaTN9S9fZDFWIloPQjpAzICKl7jLW6lw7Gh0zkVuvAstWlvzDZV4" as="fetch" type="application/wasm"></head>
+
+<body>
+    <canvas id="the_canvas_id"></canvas>
+
+<script type="module">
+import init, * as bindings from './krokett_editor_web-93faaa392d5a4963.js';
+const wasm = await init({ module_or_path: './krokett_editor_web-93faaa392d5a4963_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
+
+</html>
