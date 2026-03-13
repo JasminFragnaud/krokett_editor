@@ -5,10 +5,14 @@ use jni::objects::{JByteArray, JClass, JObject, JString};
 use egui_winit::winit::platform::android::activity::AndroidApp;
 
 #[cfg(target_os = "android")]
+use std::time::Duration;
+
+#[cfg(target_os = "android")]
 struct AndroidTextInputWorkaroundApp {
     inner: krokett_editor::MyApp,
     android_app: AndroidApp,
     last_text_state: String,
+    ime_active: bool,
 }
 
 #[cfg(target_os = "android")]
@@ -19,6 +23,7 @@ impl AndroidTextInputWorkaroundApp {
             inner: krokett_editor::MyApp::new(egui_ctx),
             android_app,
             last_text_state,
+            ime_active: false,
         }
     }
 }
@@ -27,10 +32,26 @@ impl AndroidTextInputWorkaroundApp {
 impl eframe::App for AndroidTextInputWorkaroundApp {
     fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
         self.inner.update(ctx, frame);
+
+        // Keep a small repaint cadence only while IME text editing is active.
+        if self.ime_active {
+            ctx.request_repaint_after(Duration::from_millis(8));
+        }
     }
 
     fn raw_input_hook(&mut self, ctx: &eframe::egui::Context, raw_input: &mut eframe::egui::RawInput) {
         self.inner.raw_input_hook(ctx, raw_input);
+
+        if !ctx.wants_keyboard_input() {
+            self.ime_active = false;
+            return;
+        }
+
+        if !self.ime_active {
+            self.last_text_state = self.android_app.text_input_state().text;
+            self.ime_active = true;
+            return;
+        }
 
         // Work around missing text payloads in Android keyboard events for this stack.
         let state = self.android_app.text_input_state();
@@ -40,6 +61,9 @@ impl eframe::App for AndroidTextInputWorkaroundApp {
                     raw_input
                         .events
                         .push(eframe::egui::Event::Text(inserted_text.to_owned()));
+
+                    // Ask for another frame immediately so the newly injected text is painted fast.
+                    ctx.request_repaint();
                 }
             }
 
