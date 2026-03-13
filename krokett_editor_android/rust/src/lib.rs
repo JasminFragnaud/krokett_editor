@@ -42,13 +42,16 @@ impl AndroidTextInputWorkaroundApp {
         let mut suffix = 0usize;
         while suffix < (prev_chars.len() - prefix)
             && suffix < (curr_chars.len() - prefix)
-            && prev_chars[prev_chars.len() - 1 - suffix] == curr_chars[curr_chars.len() - 1 - suffix]
+            && prev_chars[prev_chars.len() - 1 - suffix]
+                == curr_chars[curr_chars.len() - 1 - suffix]
         {
             suffix += 1;
         }
 
         let deleted = prev_chars.len().saturating_sub(prefix + suffix);
-        let inserted: String = curr_chars[prefix..(curr_chars.len() - suffix)].iter().collect();
+        let inserted: String = curr_chars[prefix..(curr_chars.len() - suffix)]
+            .iter()
+            .collect();
 
         (deleted, inserted)
     }
@@ -56,7 +59,10 @@ impl AndroidTextInputWorkaroundApp {
     fn strip_native_text_input_events(raw_input: &mut eframe::egui::RawInput) {
         raw_input.events.retain(|event| {
             !matches!(event, eframe::egui::Event::Text(_))
-                && !matches!(event, eframe::egui::Event::Ime(eframe::egui::ImeEvent::Commit(_)))
+                && !matches!(
+                    event,
+                    eframe::egui::Event::Ime(eframe::egui::ImeEvent::Commit(_))
+                )
                 && !matches!(
                     event,
                     eframe::egui::Event::Key {
@@ -66,7 +72,6 @@ impl AndroidTextInputWorkaroundApp {
                 )
         });
     }
-
 }
 
 #[cfg(target_os = "android")]
@@ -80,7 +85,11 @@ impl eframe::App for AndroidTextInputWorkaroundApp {
         }
     }
 
-    fn raw_input_hook(&mut self, ctx: &eframe::egui::Context, raw_input: &mut eframe::egui::RawInput) {
+    fn raw_input_hook(
+        &mut self,
+        ctx: &eframe::egui::Context,
+        raw_input: &mut eframe::egui::RawInput,
+    ) {
         self.inner.raw_input_hook(ctx, raw_input);
 
         if !ctx.wants_keyboard_input() {
@@ -247,4 +256,36 @@ pub extern "system" fn Java_com_github_khep_krokett_1editor_MainActivity_nativeO
     };
 
     krokett_editor::android_intent_io::push_save_result(file_name, error);
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_com_github_khep_krokett_1editor_MainActivity_nativeOnLocationUpdated(
+    mut env: jni::JNIEnv,
+    _class: JClass,
+    latitude: jni_sys::jdouble,
+    longitude: jni_sys::jdouble,
+    error_obj: JObject,
+) {
+    let error = if error_obj.is_null() {
+        None
+    } else {
+        env.get_string(&JString::from(error_obj))
+            .ok()
+            .map(|s| s.into())
+    };
+
+    let latitude = if latitude.is_nan() {
+        None
+    } else {
+        Some(latitude as f64)
+    };
+
+    let longitude = if longitude.is_nan() {
+        None
+    } else {
+        Some(longitude as f64)
+    };
+
+    krokett_editor::geolocation::push_android_location_result(latitude, longitude, error);
 }

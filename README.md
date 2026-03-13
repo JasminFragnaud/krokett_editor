@@ -2,16 +2,11 @@
 [demo-url]: https://jasminfragnaud.github.io/krokett_editor/
 [![Web-app][demo-img]][demo-url]
 
-### 1) Build release for musl
+### 1) Build path for android apks
 
 ```bash
-RUSTFLAGS="-C target-feature=-crt-static" cargo build --release --target x86_64-unknown-linux-musl
-```
-
-Note: On Fedora musl-gcc is needed
-
-```bash
-sudo dnf install musl-gcc
+./krokett_editor_android/java/app/build/outputs/apk/release/app-release-unsigned.apk
+./krokett_editor_android/java/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ### 2) Launch the app with the key

@@ -1,13 +1,20 @@
 package com.github.khep.krokett_editor;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.location.Location;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.provider.OpenableColumns;
+
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -23,6 +30,7 @@ import java.io.OutputStream;
 public class MainActivity extends GameActivity {
   private static final int REQUEST_OPEN_GPX = 1001;
   private static final int REQUEST_SAVE_GPX = 1002;
+  private static final int REQUEST_LOCATION_PERMISSION = 1003;
 
   private static MainActivity instance;
   private static byte[] pendingSaveData;
@@ -34,6 +42,64 @@ public class MainActivity extends GameActivity {
   private static native void setAppInBackground(boolean isBackground);
   private static native void nativeOnGpxOpened(String name, byte[] data, String error);
   private static native void nativeOnGpxSaved(String fileName, String error);
+  private static native void nativeOnLocationUpdated(double latitude, double longitude, String error);
+
+  public static void requestDeviceLocation() {
+    if (instance == null) {
+      nativeOnLocationUpdated(Double.NaN, Double.NaN, "MainActivity indisponible");
+      return;
+    }
+
+    instance.runOnUiThread(instance::requestOrFetchLocationOnUiThread);
+  }
+
+  private void requestOrFetchLocationOnUiThread() {
+    if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+        != PackageManager.PERMISSION_GRANTED
+        && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION)
+        != PackageManager.PERMISSION_GRANTED) {
+      ActivityCompat.requestPermissions(
+          this,
+          new String[] {
+              android.Manifest.permission.ACCESS_FINE_LOCATION,
+              android.Manifest.permission.ACCESS_COARSE_LOCATION,
+          },
+          REQUEST_LOCATION_PERMISSION);
+      return;
+    }
+
+    fetchLocation();
+  }
+
+  @SuppressWarnings("deprecation")
+  private void fetchLocation() {
+    try {
+      LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+      if (locationManager == null) {
+        nativeOnLocationUpdated(Double.NaN, Double.NaN, "LocationManager indisponible");
+        return;
+      }
+
+      Location lastKnown = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+      if (lastKnown == null) {
+        lastKnown = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+      }
+
+      if (lastKnown != null) {
+        nativeOnLocationUpdated(lastKnown.getLatitude(), lastKnown.getLongitude(), null);
+        return;
+      }
+
+      locationManager.requestSingleUpdate(
+          LocationManager.GPS_PROVIDER,
+          location -> nativeOnLocationUpdated(location.getLatitude(), location.getLongitude(), null),
+          Looper.getMainLooper());
+    } catch (SecurityException e) {
+      nativeOnLocationUpdated(Double.NaN, Double.NaN, "Permission GPS refusee: " + e.getMessage());
+    } catch (Exception e) {
+      nativeOnLocationUpdated(Double.NaN, Double.NaN, "Erreur geolocalisation: " + e.getMessage());
+    }
+  }
 
   public static void requestOpenGpx() {
     if (instance == null) {
@@ -116,6 +182,29 @@ public class MainActivity extends GameActivity {
           handleOpenResult(uri);
         } else if (requestCode == REQUEST_SAVE_GPX) {
           handleSaveResult(uri);
+        }
+      }
+
+      @Override
+      public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode != REQUEST_LOCATION_PERMISSION) {
+          return;
+        }
+
+        boolean granted = false;
+        for (int result : grantResults) {
+          if (result == PackageManager.PERMISSION_GRANTED) {
+            granted = true;
+            break;
+          }
+        }
+
+        if (granted) {
+          fetchLocation();
+        } else {
+          nativeOnLocationUpdated(Double.NaN, Double.NaN, "Permission GPS refusee");
         }
       }
 
