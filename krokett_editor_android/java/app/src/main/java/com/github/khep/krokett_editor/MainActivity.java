@@ -73,10 +73,10 @@ public class MainActivity extends GameActivity {
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
       instance = this;
 
-      // Shrink view so it does not get covered by insets.
-
+      // Keep IME insets propagation intact for GameActivity text input handling.
       View content = getWindow().getDecorView().findViewById(android.R.id.content);
       ViewCompat.setOnApplyWindowInsetsListener(content, (v, windowInsets) -> {
         Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -88,12 +88,13 @@ public class MainActivity extends GameActivity {
         mlp.rightMargin = insets.right;
         v.setLayoutParams(mlp);
 
-        return WindowInsetsCompat.CONSUMED;
+        return windowInsets;
       });
 
       WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-
-      super.onCreate(savedInstanceState);
+      content.setFocusable(true);
+      content.setFocusableInTouchMode(true);
+      content.requestFocus();
   }
 
       @Override

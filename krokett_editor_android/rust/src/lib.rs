@@ -2,6 +2,53 @@
 use jni::objects::{JByteArray, JClass, JObject, JString};
 
 #[cfg(target_os = "android")]
+use egui_winit::winit::platform::android::activity::AndroidApp;
+
+#[cfg(target_os = "android")]
+struct AndroidTextInputWorkaroundApp {
+    inner: krokett_editor::MyApp,
+    android_app: AndroidApp,
+    last_text_state: String,
+}
+
+#[cfg(target_os = "android")]
+impl AndroidTextInputWorkaroundApp {
+    fn new(egui_ctx: eframe::egui::Context, android_app: AndroidApp) -> Self {
+        let last_text_state = android_app.text_input_state().text;
+        Self {
+            inner: krokett_editor::MyApp::new(egui_ctx),
+            android_app,
+            last_text_state,
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+impl eframe::App for AndroidTextInputWorkaroundApp {
+    fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
+        self.inner.update(ctx, frame);
+    }
+
+    fn raw_input_hook(&mut self, ctx: &eframe::egui::Context, raw_input: &mut eframe::egui::RawInput) {
+        self.inner.raw_input_hook(ctx, raw_input);
+
+        // Work around missing text payloads in Android keyboard events for this stack.
+        let state = self.android_app.text_input_state();
+        if state.text != self.last_text_state {
+            if let Some(inserted_text) = state.text.strip_prefix(&self.last_text_state) {
+                if !inserted_text.is_empty() {
+                    raw_input
+                        .events
+                        .push(eframe::egui::Event::Text(inserted_text.to_owned()));
+                }
+            }
+
+            self.last_text_state = state.text;
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(
     app: egui_winit::winit::platform::android::activity::AndroidApp,
@@ -15,11 +62,16 @@ fn android_main(
     );
     let mut options = NativeOptions::default();
     options.renderer = Renderer::Wgpu;
-    options.android_app = Some(app);
+    options.android_app = Some(app.clone());
     eframe::run_native(
         "krokett_editor",
         options,
-        Box::new(|cc| Ok(Box::new(krokett_editor::MyApp::new(cc.egui_ctx.clone())))),
+        Box::new(move |cc| {
+            Ok(Box::new(AndroidTextInputWorkaroundApp::new(
+                cc.egui_ctx.clone(),
+                app.clone(),
+            )))
+        }),
     )?;
 
     Ok(())
