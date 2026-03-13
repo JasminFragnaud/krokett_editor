@@ -26,6 +26,47 @@ impl AndroidTextInputWorkaroundApp {
             ime_active: false,
         }
     }
+
+    fn diff_text(prev: &str, curr: &str) -> (usize, String) {
+        let prev_chars: Vec<char> = prev.chars().collect();
+        let curr_chars: Vec<char> = curr.chars().collect();
+
+        let mut prefix = 0usize;
+        while prefix < prev_chars.len()
+            && prefix < curr_chars.len()
+            && prev_chars[prefix] == curr_chars[prefix]
+        {
+            prefix += 1;
+        }
+
+        let mut suffix = 0usize;
+        while suffix < (prev_chars.len() - prefix)
+            && suffix < (curr_chars.len() - prefix)
+            && prev_chars[prev_chars.len() - 1 - suffix] == curr_chars[curr_chars.len() - 1 - suffix]
+        {
+            suffix += 1;
+        }
+
+        let deleted = prev_chars.len().saturating_sub(prefix + suffix);
+        let inserted: String = curr_chars[prefix..(curr_chars.len() - suffix)].iter().collect();
+
+        (deleted, inserted)
+    }
+
+    fn strip_native_text_input_events(raw_input: &mut eframe::egui::RawInput) {
+        raw_input.events.retain(|event| {
+            !matches!(event, eframe::egui::Event::Text(_))
+                && !matches!(event, eframe::egui::Event::Ime(eframe::egui::ImeEvent::Commit(_)))
+                && !matches!(
+                    event,
+                    eframe::egui::Event::Key {
+                        key: eframe::egui::Key::Backspace,
+                        ..
+                    }
+                )
+        });
+    }
+
 }
 
 #[cfg(target_os = "android")]
@@ -53,18 +94,54 @@ impl eframe::App for AndroidTextInputWorkaroundApp {
             return;
         }
 
-        // Work around missing text payloads in Android keyboard events for this stack.
-        let state = self.android_app.text_input_state();
-        if state.text != self.last_text_state {
-            if let Some(inserted_text) = state.text.strip_prefix(&self.last_text_state) {
-                if !inserted_text.is_empty() {
-                    raw_input
-                        .events
-                        .push(eframe::egui::Event::Text(inserted_text.to_owned()));
+        // Deterministic pipeline: remove native text/backspace events while editing,
+        // then inject exactly what changed according to IME state.
+        Self::strip_native_text_input_events(raw_input);
 
-                    // Ask for another frame immediately so the newly injected text is painted fast.
-                    ctx.request_repaint();
+        let state = self.android_app.text_input_state();
+        let (deleted, inserted) = Self::diff_text(&self.last_text_state, &state.text);
+        let mut deleted = deleted;
+        let mut inserted = inserted;
+
+        // Some devices report duplicated IME deltas (e.g. "11" for one key or
+        // two deletes for one backspace). Compress these specific patterns.
+        if deleted == 0 {
+            let mut chars = inserted.chars();
+            if let Some(first) = chars.next() {
+                if chars.clone().next().is_some() && chars.all(|c| c == first) {
+                    inserted = first.to_string();
                 }
+            }
+        }
+
+        if inserted.is_empty() && deleted > 1 {
+            deleted = 1;
+        }
+        if state.text != self.last_text_state {
+            for _ in 0..deleted {
+                raw_input.events.push(eframe::egui::Event::Key {
+                    key: eframe::egui::Key::Backspace,
+                    physical_key: Some(eframe::egui::Key::Backspace),
+                    pressed: true,
+                    repeat: false,
+                    modifiers: eframe::egui::Modifiers::default(),
+                });
+                raw_input.events.push(eframe::egui::Event::Key {
+                    key: eframe::egui::Key::Backspace,
+                    physical_key: Some(eframe::egui::Key::Backspace),
+                    pressed: false,
+                    repeat: false,
+                    modifiers: eframe::egui::Modifiers::default(),
+                });
+            }
+
+            if !inserted.is_empty() {
+                raw_input.events.push(eframe::egui::Event::Text(inserted));
+            }
+
+            if deleted > 0 || !state.text.is_empty() {
+                // Ask for another frame immediately so the newly injected input is painted fast.
+                ctx.request_repaint();
             }
 
             self.last_text_state = state.text;
