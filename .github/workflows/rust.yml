@@ -21,7 +21,7 @@ jobs:
       run: cargo build --release
     - name: Cargo Check All Features
       run: cargo check --all-features
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: krokett_editor_linux_${{ github.ref_name }}
         path: target/release/krokett_editor_native
@@ -41,7 +41,7 @@ jobs:
       run: cargo build --release
     - name: Cargo Check All Features
       run: cargo check --all-features
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: krokett_editor_windows_${{ github.ref_name }}.exe
         path: target\release\krokett_editor_native.exe
@@ -67,7 +67,7 @@ jobs:
     - uses: actions/checkout@v6
     - uses: Swatinem/rust-cache@v2
     - name: Setup Java JDK
-      uses: actions/setup-java@v4.5.0
+      uses: actions/setup-java@v5
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -78,7 +78,7 @@ jobs:
     - name: Build APK
       working-directory: ./krokett_editor_android
       run: make jni && cd java && ./gradlew assembleRelease
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: krokett_editor_android_${{ github.ref_name }}.apk
         path: krokett_editor_android/java/app/build/outputs/apk/release/app-release-unsigned.apk
