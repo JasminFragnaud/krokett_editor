@@ -158,6 +158,26 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
             {
                 app.gpx_state.set_waypoint_tool_enabled(waypoint_tool);
             }
+
+            if app.gpx_state.waypoint_tool_enabled() {
+                let current_position = app.geolocation.position();
+                let response = ui.add_enabled(
+                    current_position.is_some(),
+                    egui::Button::new(
+                        RichText::new("     + Waypoint                  ").size(12.0),
+                    ),
+                );
+
+                if response.clicked() {
+                    if let Some(position) = current_position {
+                        app.gpx_state.add_waypoint_at_current_position(position);
+                    }
+                }
+
+                if current_position.is_none() {
+                    response.on_hover_text("Position actuelle indisponible");
+                }
+            }
         });
 }
 

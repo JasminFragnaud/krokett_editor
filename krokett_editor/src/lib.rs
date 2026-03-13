@@ -2,8 +2,10 @@
 pub mod android_intent_io;
 mod constants;
 mod file_utils;
+pub mod geolocation;
 mod gpx;
 mod places;
+mod position_indicator;
 mod style;
 mod task_utils;
 mod tiles;
@@ -33,6 +35,7 @@ pub struct MyApp {
     clear_gpx_confirm_open: bool,
     load_gpx_channel: (Sender<FileContent>, Receiver<FileContent>),
     save_gpx_channel: (Sender<Result<FileName>>, Receiver<Result<FileName>>),
+    geolocation: geolocation::GeolocationState,
 }
 
 impl MyApp {
@@ -63,6 +66,7 @@ impl MyApp {
             load_gpx_channel: (std::sync::mpsc::channel()),
             save_gpx_channel: (std::sync::mpsc::channel()),
             clear_gpx_confirm_open: false,
+            geolocation: geolocation::GeolocationState::default(),
         }
     }
 
@@ -206,6 +210,7 @@ impl eframe::App for MyApp {
 
         self.load_gpx_from_disk(ctx);
         self.handle_save_gpx_result();
+        self.geolocation.update();
 
         self.gpx_state
             .handle_dropped_files(ctx, &mut self.map_memory);
@@ -220,7 +225,7 @@ impl eframe::App for MyApp {
             self.gpx_state
                 .apply_pending_fit(ui.available_size(), &mut self.map_memory);
 
-            let my_position = places::amancy();
+            let my_position = self.geolocation.position().unwrap_or_else(places::amancy);
 
             let tiles = self.providers.get_mut(&self.selected_provider).unwrap();
             let attributions: Vec<_> = tiles
@@ -240,6 +245,12 @@ impl eframe::App for MyApp {
                 add_waypoint_request,
             ) = self.gpx_state.add_plugins(map);
             map = map_with_plugins;
+
+            if self.geolocation.has_position() {
+                map = map.with_plugin(position_indicator::PositionIndicator {
+                    position: my_position,
+                });
+            }
 
             for (n, tiles) in tiles.iter_mut().enumerate() {
                 let transparency = if n == 0 { 1.0 } else { 0.25 };

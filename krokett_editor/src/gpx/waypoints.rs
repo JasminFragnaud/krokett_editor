@@ -3,6 +3,8 @@ use super::*;
 use geo_types::Point;
 use time::OffsetDateTime;
 
+const CURRENT_LOCATION_DUPLICATE_TOLERANCE_DEG: f64 = 1e-5;
+
 fn ensure_marker_document(documents: &mut Vec<gpx::Gpx>) -> usize {
     if documents.is_empty() {
         documents.push(gpx::Gpx {
@@ -15,6 +17,64 @@ fn ensure_marker_document(documents: &mut Vec<gpx::Gpx>) -> usize {
 }
 
 impl GpxState {
+    pub(crate) fn add_waypoint_at_position(&mut self, position: walkers::Position) {
+        let file_index = ensure_marker_document(&mut self.gpx_documents);
+        let Some(waypoints) = self
+            .gpx_documents
+            .get_mut(file_index)
+            .map(|document| &mut document.waypoints)
+        else {
+            return;
+        };
+
+        let mut waypoint = gpx::Waypoint::new(Point::new(position.x(), position.y()));
+        waypoint.time = Some(OffsetDateTime::now_utc().into());
+        waypoints.push(waypoint);
+
+        let waypoint_index = waypoints.len() - 1;
+
+        self.selected_waypoint = Some((file_index, waypoint_index));
+        self.waypoint_editor_open = true;
+        self.status = Some("Waypoint ajouté".to_owned());
+        self.toasts.success("Waypoint ajouté");
+    }
+
+    pub(crate) fn add_waypoint_at_current_position(&mut self, position: walkers::Position) {
+        if let Some(selection) =
+            self.find_waypoint_near_position(position, CURRENT_LOCATION_DUPLICATE_TOLERANCE_DEG)
+        {
+            self.selected_waypoint = Some(selection);
+            self.waypoint_editor_open = true;
+            self.status = Some("Waypoint déjà présent à cette position".to_owned());
+            self.toasts.info("Waypoint déjà présent à cette position");
+            return;
+        }
+
+        self.add_waypoint_at_position(position);
+    }
+
+    fn find_waypoint_near_position(
+        &self,
+        position: walkers::Position,
+        tolerance_deg: f64,
+    ) -> Option<WaypointSelection> {
+        self.gpx_documents
+            .iter()
+            .enumerate()
+            .find_map(|(file_index, document)| {
+                document
+                    .waypoints
+                    .iter()
+                    .enumerate()
+                    .find(|(_, waypoint)| {
+                        let point = waypoint.point();
+                        (point.x() - position.x()).abs() <= tolerance_deg
+                            && (point.y() - position.y()).abs() <= tolerance_deg
+                    })
+                    .map(|(waypoint_index, _)| (file_index, waypoint_index))
+            })
+    }
+
     pub(crate) fn consume_waypoint_click(&mut self, clicked_waypoint: ClickedWaypoint) {
         if let Some(waypoint_selection) = clicked_waypoint
             .lock()
@@ -42,25 +102,7 @@ impl GpxState {
             return;
         };
 
-        let file_index = ensure_marker_document(&mut self.gpx_documents);
-        let Some(waypoints) = self
-            .gpx_documents
-            .get_mut(file_index)
-            .map(|document| &mut document.waypoints)
-        else {
-            return;
-        };
-
-        let mut waypoint = gpx::Waypoint::new(Point::new(position.x(), position.y()));
-        waypoint.time = Some(OffsetDateTime::now_utc().into());
-        waypoints.push(waypoint);
-
-        let waypoint_index = waypoints.len() - 1;
-
-        self.selected_waypoint = Some((file_index, waypoint_index));
-        self.waypoint_editor_open = true;
-        self.status = Some("Waypoint ajouté".to_owned());
-        self.toasts.success("Waypoint ajouté");
+        self.add_waypoint_at_position(position);
     }
 
     pub(crate) fn show_waypoint_editor_window(&mut self, ctx: &egui::Context) {
