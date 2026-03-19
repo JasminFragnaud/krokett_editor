@@ -1,5 +1,6 @@
 use crate::gpx::polyline::GpxPolyline;
 use crate::gpx::waypoint_markers::GpxWaypointMarkers;
+use crate::gpx::segment_draw::SegmentDrawPlugin;
 
 use super::*;
 
@@ -20,6 +21,7 @@ impl GpxState {
         let cut_request = Arc::new(Mutex::new(None));
         let remove_request = Arc::new(Mutex::new(None));
         let add_waypoint_request = Arc::new(Mutex::new(None));
+        let draw_segment_action: PendingDrawSegmentAction = Arc::new(Mutex::new(None));
 
         let mut map_waypoints: Vec<(WaypointSelection, walkers::Position, String)> = Vec::new();
 
@@ -84,6 +86,7 @@ impl GpxState {
                             || self.tree_hover_track == Some(track_selection)
                             || self.tree_hover_segment == Some(segment_selection),
                         cut_tool_enabled: self.cut_tool_enabled,
+                        draw_mode_enabled: self.segment_draw_tool_enabled,
                         clicked_track: clicked_track.clone(),
                         clicked_segment: clicked_segment.clone(),
                         cut_request: cut_request.clone(),
@@ -140,6 +143,7 @@ impl GpxState {
                         || self.tree_hover_track == Some(track_selection)
                         || self.tree_hover_segment == Some((track_selection, 0)),
                     cut_tool_enabled: self.cut_tool_enabled,
+                    draw_mode_enabled: self.segment_draw_tool_enabled,
                     clicked_track: clicked_track.clone(),
                     clicked_segment: clicked_segment.clone(),
                     cut_request: cut_request.clone(),
@@ -156,6 +160,13 @@ impl GpxState {
             add_waypoint_request: add_waypoint_request.clone(),
         });
 
+        if self.segment_draw_tool_enabled {
+            map = map.with_plugin(SegmentDrawPlugin {
+                drawing_points: self.drawing_segment_points.clone(),
+                draw_action: draw_segment_action.clone(),
+            });
+        }
+
         (
             map,
             clicked_track,
@@ -164,6 +175,7 @@ impl GpxState {
             cut_request,
             remove_request,
             add_waypoint_request,
+            draw_segment_action,
         )
     }
 }

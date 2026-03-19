@@ -5,6 +5,7 @@ mod import_io;
 mod plugins;
 mod polyline;
 mod segments;
+mod segment_draw;
 mod tracks;
 mod tree;
 mod waypoint_markers;
@@ -82,6 +83,13 @@ type ClickedWaypoint = Arc<Mutex<Option<WaypointSelection>>>;
 type PendingCutRequest = Arc<Mutex<Option<CutRequest>>>;
 type PendingMergeRequest = Arc<Mutex<Option<MergeRequest>>>;
 type PendingAddWaypointRequest = Arc<Mutex<Option<AddWaypointRequest>>>;
+
+pub(crate) enum DrawSegmentAction {
+    AddPoint(walkers::Position),
+    UndoLast,
+}
+type PendingDrawSegmentAction = Arc<Mutex<Option<DrawSegmentAction>>>;
+
 type AddPluginsOutput<'a, 'b, 'c> = (
     Map<'a, 'b, 'c>,
     ClickedTrack,
@@ -90,6 +98,7 @@ type AddPluginsOutput<'a, 'b, 'c> = (
     PendingCutRequest,
     PendingMergeRequest,
     PendingAddWaypointRequest,
+    PendingDrawSegmentAction,
 );
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -125,6 +134,9 @@ pub(crate) struct GpxState {
     window_highlight_waypoint: Option<WaypointSelection>,
     waypoint_delete_confirm_open: bool,
     altitude_profile: altitude_profile::AltitudeProfileState,
+    segment_draw_tool_enabled: bool,
+    drawing_segment_points: Vec<walkers::Position>,
+    temp_altitude_profile: altitude_profile::TempAltitudeProfileState,
 }
 
 impl GpxState {
@@ -155,6 +167,9 @@ impl GpxState {
             window_highlight_waypoint: None,
             waypoint_delete_confirm_open: false,
             altitude_profile: altitude_profile::AltitudeProfileState::new(),
+            segment_draw_tool_enabled: false,
+            drawing_segment_points: Vec::new(),
+            temp_altitude_profile: altitude_profile::TempAltitudeProfileState::new(),
         }
     }
 
@@ -233,6 +248,9 @@ impl GpxState {
         self.window_highlight_waypoint = None;
         self.waypoint_delete_confirm_open = false;
         self.altitude_profile.close();
+        self.segment_draw_tool_enabled = false;
+        self.drawing_segment_points.clear();
+        self.temp_altitude_profile.close();
     }
 
     pub(crate) fn show_toast(&mut self, ctx: &egui::Context) {

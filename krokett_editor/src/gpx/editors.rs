@@ -72,6 +72,7 @@ impl GpxState {
         let mut segment_comment = self.segment_comment((track_selection, segment_index));
 
         let response = egui::Window::new(format!("Segment {}", segment_index + 1))
+            .id(egui::Id::new("segment_editor_window"))
             .open(&mut open)
             .resizable(true)
             .default_width(320.0)

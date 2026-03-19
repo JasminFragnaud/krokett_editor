@@ -52,6 +52,14 @@ pub(super) fn extract_altitude_profile(waypoints: &[gpx::Waypoint]) -> Vec<(f64,
     profile
 }
 
+fn format_altitude_tooltip(name: &str, dist_km: f64, alt_m: f64) -> String {
+    if name.is_empty() {
+        format!("dist: {:.1} km\nalt: {:.0} m", dist_km, alt_m)
+    } else {
+        format!("{name}\ndist: {:.0} km\nalt: {:.0} m", dist_km, alt_m)
+    }
+}
+
 pub struct AltitudeProfileState {
     pub open: bool,
     pub selected_segment: Option<SegmentSelection>,
@@ -74,6 +82,40 @@ impl AltitudeProfileState {
     pub fn close(&mut self) {
         self.open = false;
         self.selected_segment = None;
+        self.elevation_results = Arc::new(Mutex::new(None));
+        self.fetch_in_progress = false;
+        self.fetch_start_time = None;
+    }
+}
+
+pub struct TempAltitudeProfileState {
+    pub open: bool,
+    pub waypoints: Vec<gpx::Waypoint>,
+    elevation_results: ElevationResults,
+    fetch_in_progress: bool,
+    fetch_start_time: Option<std::time::Instant>,
+}
+
+impl TempAltitudeProfileState {
+    pub fn new() -> Self {
+        Self {
+            open: false,
+            waypoints: Vec::new(),
+            elevation_results: Arc::new(Mutex::new(None)),
+            fetch_in_progress: false,
+            fetch_start_time: None,
+        }
+    }
+
+    pub fn close(&mut self) {
+        self.open = false;
+        self.waypoints.clear();
+        self.elevation_results = Arc::new(Mutex::new(None));
+        self.fetch_in_progress = false;
+        self.fetch_start_time = None;
+    }
+
+    pub fn reset_fetch(&mut self) {
         self.elevation_results = Arc::new(Mutex::new(None));
         self.fetch_in_progress = false;
         self.fetch_start_time = None;
@@ -252,6 +294,9 @@ impl GpxState {
 
                 // Draw the altitude profile plot
                 Plot::new("altitude_profile_plot")
+                    .label_formatter(|name, value| {
+                        format_altitude_tooltip(name, value.x, value.y)
+                    })
                     .view_aspect(2.0)
                     .show(ui, |plot_ui| {
                         plot_ui.line(line);
@@ -262,5 +307,171 @@ impl GpxState {
         if !self.altitude_profile.open {
             self.altitude_profile.selected_segment = None;
         }
+    }
+}
+
+impl GpxState {
+    pub(crate) fn show_temp_altitude_profile_window(&mut self, ctx: &egui::Context) {
+        if !self.temp_altitude_profile.open {
+            return;
+        }
+
+        // Start elevation fetch for waypoints that have no elevation
+        if !self.temp_altitude_profile.fetch_in_progress {
+            let needs_elevation = self
+                .temp_altitude_profile
+                .waypoints
+                .iter()
+                .any(|wp| wp.elevation.is_none());
+
+            if needs_elevation {
+                let positions: Vec<walkers::Position> = self
+                    .temp_altitude_profile
+                    .waypoints
+                    .iter()
+                    .filter(|wp| wp.elevation.is_none())
+                    .map(|wp| {
+                        let point = wp.point();
+                        walkers::lat_lon(point.y(), point.x())
+                    })
+                    .collect();
+
+                if !positions.is_empty() {
+                    log::info!(
+                        "Fetching elevation for {} temp segment waypoints",
+                        positions.len()
+                    );
+                    crate::elevation_service::fetch_elevation_for_positions(
+                        positions,
+                        self.temp_altitude_profile.elevation_results.clone(),
+                    );
+                    self.temp_altitude_profile.fetch_in_progress = true;
+                    self.temp_altitude_profile.fetch_start_time =
+                        Some(std::time::Instant::now());
+                }
+            }
+        }
+
+        // Check fetch timeout (10 seconds)
+        if self.temp_altitude_profile.fetch_in_progress {
+            if let Some(start_time) = self.temp_altitude_profile.fetch_start_time {
+                if start_time.elapsed().as_secs() > 10 {
+                    log::warn!("Temp segment elevation fetch timed out");
+                    self.temp_altitude_profile.fetch_in_progress = false;
+                    self.temp_altitude_profile.fetch_start_time = None;
+                }
+            }
+        }
+
+        // Apply fetched elevations
+        let fetched_elevations = {
+            let mut results = self.temp_altitude_profile.elevation_results.lock().ok();
+            results.as_mut().and_then(|r| r.take())
+        };
+        if let Some(elevations) = fetched_elevations {
+            for waypoint in &mut self.temp_altitude_profile.waypoints {
+                if waypoint.elevation.is_some() {
+                    continue;
+                }
+                let point = waypoint.point();
+                let wp_pos = walkers::lat_lon(point.y(), point.x());
+                for (fetched_pos, elevation) in &elevations {
+                    if (wp_pos.x() - fetched_pos.x()).abs() < 1e-6
+                        && (wp_pos.y() - fetched_pos.y()).abs() < 1e-6
+                    {
+                        waypoint.elevation = Some(*elevation);
+                        break;
+                    }
+                }
+            }
+            self.temp_altitude_profile.fetch_in_progress = false;
+            self.temp_altitude_profile.fetch_start_time = None;
+        }
+
+        let profile_data = extract_altitude_profile(&self.temp_altitude_profile.waypoints);
+        let fetch_in_progress = self.temp_altitude_profile.fetch_in_progress;
+        let mut open = self.temp_altitude_profile.open;
+
+        if profile_data.is_empty() {
+            egui::Window::new("Profil d'altitude - Segment temporaire")
+                .open(&mut open)
+                .resizable(true)
+                .default_width(600.0)
+                .default_height(200.0)
+                .show(ctx, |ui| {
+                    if fetch_in_progress {
+                        ui.label("⏳ Récupération des données d'altitude...");
+                    } else {
+                        ui.label("Aucune donnée d'altitude disponible");
+                    }
+                });
+            self.temp_altitude_profile.open = open;
+            return;
+        }
+
+        let points: Vec<[f64; 2]> = profile_data.iter().map(|&(x, y)| [x, y]).collect();
+        let line = Line::new("Profil", PlotPoints::new(points)).fill(0.0);
+
+        egui::Window::new("Profil d'altitude - Segment temporaire")
+            .open(&mut open)
+            .resizable(true)
+            .default_width(600.0)
+            .default_height(400.0)
+            .show(ctx, |ui| {
+                let max_elevation = profile_data
+                    .iter()
+                    .map(|(_, e)| *e)
+                    .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap_or(0.0);
+                let min_elevation = profile_data
+                    .iter()
+                    .map(|(_, e)| *e)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap_or(0.0);
+                let total_distance = profile_data.last().map(|(x, _)| *x).unwrap_or(0.0);
+
+                let (mut climb, mut descent) = (0.0f64, 0.0f64);
+                for w in profile_data.windows(2) {
+                    let diff = w[1].1 - w[0].1;
+                    if diff > 0.0 {
+                        climb += diff;
+                    } else {
+                        descent -= diff;
+                    }
+                }
+
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Distance: {:.2} km",
+                                total_distance
+                            ))
+                            .strong(),
+                        );
+                        ui.label(format!(
+                            "Élévation: {:.0}m - {:.0}m",
+                            min_elevation, max_elevation
+                        ));
+                        ui.label(format!(
+                            "Montée: {:.0}m | Descente: {:.0}m",
+                            climb, descent
+                        ));
+                    });
+                });
+
+                ui.separator();
+
+                Plot::new("temp_altitude_profile_plot")
+                    .label_formatter(|name, value| {
+                        format_altitude_tooltip(name, value.x, value.y)
+                    })
+                    .view_aspect(2.0)
+                    .show(ui, |plot_ui| {
+                        plot_ui.line(line);
+                    });
+            });
+
+        self.temp_altitude_profile.open = open;
     }
 }

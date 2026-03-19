@@ -96,6 +96,12 @@ pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
                 );
             }
 
+            if app.gpx_state.segment_draw_tool_enabled() {
+                ui.label(
+                    "Segment temporaire activé:\nClic gauche : ajouter un point, clic droit : annuler le dernier point,\nBouton Profil temporaire : afficher montée/descente",
+                );
+            }
+
             if let Some(status) = app.gpx_state.status() {
                 ui.label(status);
             }
@@ -157,6 +163,33 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
                 .changed()
             {
                 app.gpx_state.set_waypoint_tool_enabled(waypoint_tool);
+            }
+
+            let mut segment_draw_tool = app.gpx_state.segment_draw_tool_enabled();
+            if ui
+                .checkbox(&mut segment_draw_tool, "Segment temporaire")
+                .changed()
+            {
+                app.gpx_state.set_segment_draw_tool_enabled(segment_draw_tool);
+            }
+
+            if app.gpx_state.segment_draw_tool_enabled() {
+                let point_count = app.gpx_state.drawing_segment_points().len();
+                ui.label(format!("Points: {point_count}"));
+
+                let can_finalize = point_count >= 2;
+                if ui
+                    .add_enabled(can_finalize, egui::Button::new("📈 Profil temporaire"))
+                    .clicked()
+                {
+                    app.gpx_state.finalize_temp_segment();
+                }
+
+                if ui.button("Effacer segment").clicked() {
+                    app.gpx_state.clear_drawing_segment();
+                }
+
+                ui.label("Clic gauche carte: ajouter un point | Clic droit: annuler le dernier point");
             }
 
             if app.gpx_state.waypoint_tool_enabled() {
