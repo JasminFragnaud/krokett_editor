@@ -71,7 +71,7 @@ impl GpxState {
         let mut segment_description = self.segment_description((track_selection, segment_index));
         let mut segment_comment = self.segment_comment((track_selection, segment_index));
 
-        let response = egui::Window::new(format!("Segment {segment_index}"))
+        let response = egui::Window::new(format!("Segment {}", segment_index + 1))
             .open(&mut open)
             .resizable(true)
             .default_width(320.0)
@@ -166,6 +166,13 @@ impl GpxState {
                         }
                     }
                 });
+                ui.separator();
+
+                if ui.button("📊 Profil d'altitude").clicked() {
+                    self.altitude_profile.open = true;
+                    self.altitude_profile.selected_segment = Some((track_selection, segment_index));
+                }
+
                 ui.separator();
                 ui.label("Description");
                 ui.text_edit_multiline(&mut segment_description);

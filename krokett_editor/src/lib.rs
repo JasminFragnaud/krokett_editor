@@ -1,6 +1,7 @@
 #[cfg(target_os = "android")]
 pub mod android_intent_io;
 mod constants;
+mod elevation_service;
 mod file_utils;
 pub mod geolocation;
 mod gpx;
@@ -276,6 +277,7 @@ impl eframe::App for MyApp {
         self.gpx_state.show_metadata_editor_window(ctx);
         self.gpx_state.show_segment_editor_window(ctx);
         self.gpx_state.show_waypoint_editor_window(ctx);
+        self.gpx_state.show_altitude_profile_window(ctx);
         clear_gpx_confirmation_modal(self, ctx);
         self.gpx_state.show_toast(ctx);
     }

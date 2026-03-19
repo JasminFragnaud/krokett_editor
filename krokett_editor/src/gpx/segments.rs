@@ -45,7 +45,7 @@ impl GpxState {
         }
     }
 
-    fn segment_waypoints_mut(
+    pub(super) fn segment_waypoints_mut(
         &mut self,
         selection: SegmentSelection,
     ) -> Option<&mut Vec<gpx::Waypoint>> {

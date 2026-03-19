@@ -1,3 +1,4 @@
+mod altitude_profile;
 mod editing;
 mod editors;
 mod import_io;
@@ -123,6 +124,7 @@ pub(crate) struct GpxState {
     selected_waypoint: Option<WaypointSelection>,
     window_highlight_waypoint: Option<WaypointSelection>,
     waypoint_delete_confirm_open: bool,
+    altitude_profile: altitude_profile::AltitudeProfileState,
 }
 
 impl GpxState {
@@ -152,6 +154,7 @@ impl GpxState {
             selected_waypoint: None,
             window_highlight_waypoint: None,
             waypoint_delete_confirm_open: false,
+            altitude_profile: altitude_profile::AltitudeProfileState::new(),
         }
     }
 
@@ -229,6 +232,7 @@ impl GpxState {
         self.selected_waypoint = None;
         self.window_highlight_waypoint = None;
         self.waypoint_delete_confirm_open = false;
+        self.altitude_profile.close();
     }
 
     pub(crate) fn show_toast(&mut self, ctx: &egui::Context) {
