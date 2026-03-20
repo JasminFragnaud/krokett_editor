@@ -170,7 +170,8 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
                 .checkbox(&mut segment_draw_tool, "Segment temporaire")
                 .changed()
             {
-                app.gpx_state.set_segment_draw_tool_enabled(segment_draw_tool);
+                app.gpx_state
+                    .set_segment_draw_tool_enabled(segment_draw_tool);
             }
 
             if app.gpx_state.segment_draw_tool_enabled() {
@@ -189,7 +190,9 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
                     app.gpx_state.clear_drawing_segment();
                 }
 
-                ui.label("Clic gauche carte: ajouter un point | Clic droit: annuler le dernier point");
+                ui.label(
+                    "Clic gauche carte: ajouter un point | Clic droit: annuler le dernier point",
+                );
             }
 
             if app.gpx_state.waypoint_tool_enabled() {

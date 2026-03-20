@@ -36,7 +36,6 @@ impl GpxState {
                 ui.text_edit_singleline(&mut track_name);
                 ui.label("Description");
                 ui.text_edit_multiline(&mut track_description);
-                
             });
 
         self.set_track_metadata(track_selection, track_name, track_description);

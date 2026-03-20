@@ -58,6 +58,8 @@ impl MyApp {
         }
         egui_material_icons::initialize(&egui_ctx);
 
+        crate::elevation_service::init_offline_elevation();
+
         Self {
             providers: providers(egui_ctx.to_owned()),
             selected_provider: Provider::IgnRandonnee25k,
@@ -267,7 +269,8 @@ impl eframe::App for MyApp {
             self.gpx_state.consume_remove_request(remove_request);
             self.gpx_state
                 .consume_add_waypoint_request(add_waypoint_request);
-            self.gpx_state.consume_draw_segment_action(draw_segment_action);
+            self.gpx_state
+                .consume_draw_segment_action(draw_segment_action);
 
             {
                 cut_tool_controls(self, ui);

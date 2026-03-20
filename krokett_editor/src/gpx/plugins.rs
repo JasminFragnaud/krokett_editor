@@ -1,6 +1,6 @@
 use crate::gpx::polyline::GpxPolyline;
-use crate::gpx::waypoint_markers::GpxWaypointMarkers;
 use crate::gpx::segment_draw::SegmentDrawPlugin;
+use crate::gpx::waypoint_markers::GpxWaypointMarkers;
 
 use super::*;
 

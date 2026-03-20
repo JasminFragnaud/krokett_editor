@@ -20,8 +20,7 @@ fn distance_between_waypoints(wp1: &gpx::Waypoint, wp2: &gpx::Waypoint) -> f64 {
     let dlat = lat2 - lat1;
     let dlon = lon2 - lon1;
 
-    let a = (dlat / 2.0).sin().powi(2)
-        + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
+    let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
     let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
     EARTH_RADIUS_KM * c
@@ -54,9 +53,9 @@ pub(super) fn extract_altitude_profile(waypoints: &[gpx::Waypoint]) -> Vec<(f64,
 
 fn format_altitude_tooltip(name: &str, dist_km: f64, alt_m: f64) -> String {
     if name.is_empty() {
-        format!("dist: {:.1} km\nalt: {:.0} m", dist_km, alt_m)
+        format!("dist: {dist_km:.1} km\nalt: {alt_m:.0} m")
     } else {
-        format!("{name}\ndist: {:.0} km\nalt: {:.0} m", dist_km, alt_m)
+        format!("{name}\ndist: {dist_km:.0} km\nalt: {alt_m:.0} m")
     }
 }
 
@@ -160,10 +159,8 @@ impl GpxState {
         // Check if we need to start fetching elevation data
         if !self.altitude_profile.fetch_in_progress && !self.altitude_profile.fetch_attempted {
             if let Some(waypoints) = self.segment_waypoints(segment_selection) {
-                let waypoints_without_elevation = waypoints
-                    .iter()
-                    .filter(|wp| wp.elevation.is_none())
-                    .count();
+                let waypoints_without_elevation =
+                    waypoints.iter().filter(|wp| wp.elevation.is_none()).count();
 
                 if waypoints_without_elevation > 0 {
                     // Start fetching elevation data
@@ -310,14 +307,13 @@ impl GpxState {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
-                            egui::RichText::new(format!(
-                                "Distance: {:.2} km",
-                                total_distance
-                            ))
-                            .strong(),
+                            egui::RichText::new(format!("Distance: {total_distance:.2} km"))
+                                .strong(),
                         );
-                        ui.label(format!("Élévation: {:.0}m - {:.0}m", min_elevation, max_elevation));
-                        ui.label(format!("Montée: {:.0}m | Descente: {:.0}m", climb, descent));
+                        ui.label(format!(
+                            "Élévation: {min_elevation:.0}m - {max_elevation:.0}m"
+                        ));
+                        ui.label(format!("Montée: {climb:.0}m | Descente: {descent:.0}m"));
                     });
                 });
 
@@ -325,9 +321,7 @@ impl GpxState {
 
                 // Draw the altitude profile plot
                 Plot::new("altitude_profile_plot")
-                    .label_formatter(|name, value| {
-                        format_altitude_tooltip(name, value.x, value.y)
-                    })
+                    .label_formatter(|name, value| format_altitude_tooltip(name, value.x, value.y))
                     .view_aspect(2.0)
                     .show(ui, |plot_ui| {
                         plot_ui.line(line);
@@ -381,8 +375,7 @@ impl GpxState {
                     );
                     self.temp_altitude_profile.fetch_in_progress = true;
                     self.temp_altitude_profile.fetch_attempted = true;
-                    self.temp_altitude_profile.fetch_start_time =
-                        Some(std::time::Instant::now());
+                    self.temp_altitude_profile.fetch_start_time = Some(std::time::Instant::now());
                     self.temp_altitude_profile.fetch_timed_out = false;
                 }
             }
@@ -487,29 +480,20 @@ impl GpxState {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
-                            egui::RichText::new(format!(
-                                "Distance: {:.2} km",
-                                total_distance
-                            ))
-                            .strong(),
+                            egui::RichText::new(format!("Distance: {total_distance:.2} km"))
+                                .strong(),
                         );
                         ui.label(format!(
-                            "Élévation: {:.0}m - {:.0}m",
-                            min_elevation, max_elevation
+                            "Élévation: {min_elevation:.0}m - {max_elevation:.0}m"
                         ));
-                        ui.label(format!(
-                            "Montée: {:.0}m | Descente: {:.0}m",
-                            climb, descent
-                        ));
+                        ui.label(format!("Montée: {climb:.0}m | Descente: {descent:.0}m"));
                     });
                 });
 
                 ui.separator();
 
                 Plot::new("temp_altitude_profile_plot")
-                    .label_formatter(|name, value| {
-                        format_altitude_tooltip(name, value.x, value.y)
-                    })
+                    .label_formatter(|name, value| format_altitude_tooltip(name, value.x, value.y))
                     .view_aspect(2.0)
                     .show(ui, |plot_ui| {
                         plot_ui.line(line);
