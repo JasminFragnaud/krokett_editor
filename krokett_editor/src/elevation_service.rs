@@ -190,16 +190,34 @@ fn build_elevation_request(positions: &[Position]) -> ehttp::Request {
 
     let request_body = serde_json::to_string(&ElevationRequest { locations }).unwrap_or_default();
 
-    let mut request = ehttp::Request {
-        url: OPEN_TOPO_DATA_URL.to_string(),
-        method: "POST".to_string(),
-        body: request_body.into_bytes(),
-        headers: Default::default(),
-    };
-    request
-        .headers
-        .insert("Content-Type".to_string(), "application/json".to_string());
-    request
+    #[cfg(target_arch = "wasm32")]
+    {
+        let mut request = ehttp::Request {
+            url: OPEN_TOPO_DATA_URL.to_string(),
+            method: "POST".to_string(),
+            body: request_body.into_bytes(),
+            headers: Default::default(),
+            mode: Default::default(),
+        };
+        request
+            .headers
+            .insert("Content-Type".to_string(), "application/json".to_string());
+        request
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let mut request = ehttp::Request {
+            url: OPEN_TOPO_DATA_URL.to_string(),
+            method: "POST".to_string(),
+            body: request_body.into_bytes(),
+            headers: Default::default(),
+        };
+        request
+            .headers
+            .insert("Content-Type".to_string(), "application/json".to_string());
+        request
+    }
 }
 
 fn parse_elevation_response(
