@@ -100,6 +100,8 @@ impl GpxState {
                     self.altitude_profile.reset_fetch();
                     self.altitude_profile.selected_segment = Some((track_selection, segment_index));
                     self.altitude_profile.open = true;
+                    self.altitude_profile.fetch_start_deferred = true;
+                    ui.ctx().request_repaint();
                 }
 
                 ui.separator();
