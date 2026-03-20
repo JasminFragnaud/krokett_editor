@@ -1,6 +1,7 @@
 #[cfg(target_os = "android")]
 pub mod android_intent_io;
 mod constants;
+mod elevation_service;
 mod file_utils;
 pub mod geolocation;
 mod gpx;
@@ -56,6 +57,8 @@ impl MyApp {
             egui_ctx.set_visuals(Self::light_visuals_with_black_text());
         }
         egui_material_icons::initialize(&egui_ctx);
+
+        crate::elevation_service::init_offline_elevation();
 
         Self {
             providers: providers(egui_ctx.to_owned()),
@@ -243,6 +246,7 @@ impl eframe::App for MyApp {
                 cut_request,
                 remove_request,
                 add_waypoint_request,
+                draw_segment_action,
             ) = self.gpx_state.add_plugins(map);
             map = map_with_plugins;
 
@@ -265,6 +269,8 @@ impl eframe::App for MyApp {
             self.gpx_state.consume_remove_request(remove_request);
             self.gpx_state
                 .consume_add_waypoint_request(add_waypoint_request);
+            self.gpx_state
+                .consume_draw_segment_action(draw_segment_action);
 
             {
                 cut_tool_controls(self, ui);
@@ -276,6 +282,8 @@ impl eframe::App for MyApp {
         self.gpx_state.show_metadata_editor_window(ctx);
         self.gpx_state.show_segment_editor_window(ctx);
         self.gpx_state.show_waypoint_editor_window(ctx);
+        self.gpx_state.show_altitude_profile_window(ctx);
+        self.gpx_state.show_temp_altitude_profile_window(ctx);
         clear_gpx_confirmation_modal(self, ctx);
         self.gpx_state.show_toast(ctx);
     }

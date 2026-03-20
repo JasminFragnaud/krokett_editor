@@ -19,12 +19,17 @@ impl GpxState {
         let mut track_name = self.track_name(track_selection).unwrap_or_default();
         let mut track_description = self.track_description(track_selection).unwrap_or_default();
         let source = self.source_for_file(track_selection.file_index);
+        let mut open_track_profile = false;
 
         egui::Window::new(format!("Trace {track_name}"))
             .open(&mut open)
             .resizable(true)
             .default_width(320.0)
             .show(ctx, |ui| {
+                if ui.button("📊 Profil d'altitude (trace)").clicked() {
+                    open_track_profile = true;
+                }
+                ui.separator();
                 ui.label(format!("Source: {source}"));
                 ui.separator();
                 ui.label("Nom");
@@ -34,6 +39,20 @@ impl GpxState {
             });
 
         self.set_track_metadata(track_selection, track_name, track_description);
+
+        if open_track_profile {
+            if let Some(waypoints) = self.track_waypoints(track_selection) {
+                if !waypoints.is_empty() {
+                    let profile_title = format!(
+                        "Profil d'altitude - Trace {}",
+                        self.track_name(track_selection)
+                            .filter(|name| !name.trim().is_empty())
+                            .unwrap_or_else(|| "Sans nom".to_owned())
+                    );
+                    self.open_temp_altitude_profile(profile_title, waypoints);
+                }
+            }
+        }
 
         self.metadata_editor_open = open;
         if !self.metadata_editor_open {
@@ -71,11 +90,19 @@ impl GpxState {
         let mut segment_description = self.segment_description((track_selection, segment_index));
         let mut segment_comment = self.segment_comment((track_selection, segment_index));
 
-        let response = egui::Window::new(format!("Segment {segment_index}"))
+        let response = egui::Window::new(format!("Segment {}", segment_index + 1))
+            .id(egui::Id::new("segment_editor_window"))
             .open(&mut open)
             .resizable(true)
             .default_width(320.0)
             .show(ctx, |ui| {
+                if ui.button("📊 Profil d'altitude").clicked() {
+                    self.altitude_profile.reset_fetch();
+                    self.altitude_profile.selected_segment = Some((track_selection, segment_index));
+                    self.altitude_profile.open = true;
+                }
+
+                ui.separator();
                 ui.label(format!("Trace: {track_name}"));
                 ui.horizontal(|ui| {
                     let prev_enabled = segment_index > 0;
@@ -167,6 +194,7 @@ impl GpxState {
                     }
                 });
                 ui.separator();
+
                 ui.label("Description");
                 ui.text_edit_multiline(&mut segment_description);
             });

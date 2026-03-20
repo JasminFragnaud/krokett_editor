@@ -121,6 +121,30 @@ impl GpxState {
         }
     }
 
+    pub(super) fn track_waypoints(
+        &self,
+        track_selection: TrackSelection,
+    ) -> Option<Vec<gpx::Waypoint>> {
+        match track_selection.kind {
+            GpxTrackKind::Track => self
+                .gpx_documents
+                .get(track_selection.file_index)
+                .and_then(|document| document.tracks.get(track_selection.track_index))
+                .map(|track| {
+                    track
+                        .segments
+                        .iter()
+                        .flat_map(|segment| segment.points.iter().cloned())
+                        .collect()
+                }),
+            GpxTrackKind::Route => self
+                .gpx_documents
+                .get(track_selection.file_index)
+                .and_then(|document| document.routes.get(track_selection.track_index))
+                .map(|route| route.points.clone()),
+        }
+    }
+
     pub(super) fn is_track_visible(&self, track_selection: TrackSelection) -> bool {
         self.track_visibility
             .get(&track_selection)

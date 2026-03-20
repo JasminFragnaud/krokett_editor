@@ -16,6 +16,7 @@ pub struct GpxPolyline {
     pub has_next_separator: bool,
     pub window_highlighted: bool,
     pub cut_tool_enabled: bool,
+    pub draw_mode_enabled: bool,
     pub clicked_track: ClickedTrack,
     pub clicked_segment: Arc<Mutex<Option<SegmentSelection>>>,
     pub cut_request: Arc<Mutex<Option<CutRequest>>>,
@@ -216,6 +217,7 @@ impl Plugin for GpxPolyline {
         if response.clicked_by(PointerButton::Secondary) {
             if let Some(pointer_pos) = response.interact_pointer_pos() {
                 if !self.cut_tool_enabled
+                    && !self.draw_mode_enabled
                     && pointer_hits_polyline(pointer_pos, &self.positions, projector)
                 {
                     if let Ok(mut clicked) = self.clicked_track.lock() {
@@ -227,7 +229,9 @@ impl Plugin for GpxPolyline {
 
         if response.clicked_by(PointerButton::Primary) {
             if let Some(pointer_pos) = response.interact_pointer_pos() {
-                if self.cut_tool_enabled {
+                if self.draw_mode_enabled {
+                    // In draw mode, clicks are handled exclusively by SegmentDrawPlugin
+                } else if self.cut_tool_enabled {
                     if let Some(left_index) = merge_left_index_from_separator_click(
                         pointer_pos,
                         &self.positions,
