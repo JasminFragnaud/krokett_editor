@@ -280,7 +280,25 @@ fn parse_elevation_response(
 
 #[cfg(target_arch = "wasm32")]
 async fn yield_to_runtime() {
-    gloo_timers::future::TimeoutFuture::new(0).await;
+    use futures::channel::oneshot;
+    use wasm_bindgen::{JsCast, closure::Closure};
+
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+
+    let (sender, receiver) = oneshot::channel();
+    let callback = Closure::once(move || {
+        let _ = sender.send(());
+    });
+
+    if window
+        .request_animation_frame(callback.as_ref().unchecked_ref())
+        .is_ok()
+    {
+        callback.forget();
+        let _ = receiver.await;
+    }
 }
 
 async fn split_offline_coverage_async(
