@@ -80,7 +80,10 @@ fn start_elevation_fetch(
         return None;
     }
 
-    log::info!("Fetching elevation for {} waypoints ({title})", positions.len());
+    log::info!(
+        "Fetching elevation for {} waypoints ({title})",
+        positions.len()
+    );
     crate::elevation_service::fetch_elevation_for_positions(positions, sender);
     Some(ctx.input(|i| i.time))
 }
@@ -114,9 +117,9 @@ fn take_fetched_elevation_lookup(
 
     Some(
         elevations
-        .iter()
-        .map(|(pos, elevation)| ((pos.x().to_bits(), pos.y().to_bits()), *elevation))
-        .collect(),
+            .iter()
+            .map(|(pos, elevation)| ((pos.x().to_bits(), pos.y().to_bits()), *elevation))
+            .collect(),
     )
 }
 
@@ -237,10 +240,10 @@ impl GpxState {
         if !self.altitude_profile.fetch_in_progress && !self.altitude_profile.fetch_attempted {
             if let Some(waypoints) = self.segment_waypoints(segment_selection) {
                 if let Some(start_time) = start_elevation_fetch(
-                ctx,
-                "Profil d'altitude",
-                waypoints,
-                self.altitude_profile.elevation_results.0.clone(),
+                    ctx,
+                    "Profil d'altitude",
+                    waypoints,
+                    self.altitude_profile.elevation_results.0.clone(),
                 ) {
                     self.altitude_profile.fetch_in_progress = true;
                     self.altitude_profile.fetch_attempted = true;
@@ -258,7 +261,9 @@ impl GpxState {
             &mut self.altitude_profile.fetch_timed_out,
         );
 
-        if let Some(elevation_by_pos) = take_fetched_elevation_lookup(&self.altitude_profile.elevation_results) {
+        if let Some(elevation_by_pos) =
+            take_fetched_elevation_lookup(&self.altitude_profile.elevation_results)
+        {
             if let Some(waypoints) = self.segment_waypoints_mut(segment_selection) {
                 apply_elevation_lookup(&elevation_by_pos, waypoints);
             }
@@ -477,9 +482,7 @@ impl GpxState {
 
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            format!("Distance: {total_distance:.2} km"),
-                        );
+                        ui.label(format!("Distance: {total_distance:.2} km"));
                         ui.label(format!(
                             "Élévation: {min_elevation:.0}m - {max_elevation:.0}m"
                         ));

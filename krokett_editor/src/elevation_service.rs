@@ -355,7 +355,10 @@ async fn fetch_via_api_async(positions: Vec<Position>) -> Vec<(Position, f64)> {
 ///
 /// Uses the offline SRTM database when available (fast, no network).
 /// Falls back to the OpenTopoData API for any position not covered offline.
-pub fn fetch_elevation_for_positions(positions: Vec<Position>, sender: Sender<Vec<(Position, f64)>>) {
+pub fn fetch_elevation_for_positions(
+    positions: Vec<Position>,
+    sender: Sender<Vec<(Position, f64)>>,
+) {
     if positions.is_empty() {
         return;
     }
