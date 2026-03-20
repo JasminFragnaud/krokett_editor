@@ -65,7 +65,9 @@ pub struct AltitudeProfileState {
     pub selected_segment: Option<SegmentSelection>,
     elevation_results: ElevationResults,
     fetch_in_progress: bool,
+    fetch_attempted: bool,
     fetch_start_time: Option<std::time::Instant>,
+    fetch_timed_out: bool,
 }
 
 impl AltitudeProfileState {
@@ -75,54 +77,80 @@ impl AltitudeProfileState {
             selected_segment: None,
             elevation_results: Arc::new(Mutex::new(None)),
             fetch_in_progress: false,
+            fetch_attempted: false,
             fetch_start_time: None,
+            fetch_timed_out: false,
         }
+    }
+
+    pub fn reset_fetch(&mut self) {
+        self.elevation_results = Arc::new(Mutex::new(None));
+        self.fetch_in_progress = false;
+        self.fetch_attempted = false;
+        self.fetch_start_time = None;
+        self.fetch_timed_out = false;
     }
 
     pub fn close(&mut self) {
         self.open = false;
         self.selected_segment = None;
-        self.elevation_results = Arc::new(Mutex::new(None));
-        self.fetch_in_progress = false;
-        self.fetch_start_time = None;
+        self.reset_fetch();
     }
 }
 
 pub struct TempAltitudeProfileState {
     pub open: bool,
+    pub title: String,
     pub waypoints: Vec<gpx::Waypoint>,
     elevation_results: ElevationResults,
     fetch_in_progress: bool,
+    fetch_attempted: bool,
     fetch_start_time: Option<std::time::Instant>,
+    fetch_timed_out: bool,
 }
 
 impl TempAltitudeProfileState {
     pub fn new() -> Self {
         Self {
             open: false,
+            title: "Profil d'altitude - Segment temporaire".to_owned(),
             waypoints: Vec::new(),
             elevation_results: Arc::new(Mutex::new(None)),
             fetch_in_progress: false,
+            fetch_attempted: false,
             fetch_start_time: None,
+            fetch_timed_out: false,
         }
     }
 
     pub fn close(&mut self) {
         self.open = false;
+        self.title = "Profil d'altitude - Segment temporaire".to_owned();
         self.waypoints.clear();
-        self.elevation_results = Arc::new(Mutex::new(None));
-        self.fetch_in_progress = false;
-        self.fetch_start_time = None;
+        self.reset_fetch();
     }
 
     pub fn reset_fetch(&mut self) {
         self.elevation_results = Arc::new(Mutex::new(None));
         self.fetch_in_progress = false;
+        self.fetch_attempted = false;
         self.fetch_start_time = None;
+        self.fetch_timed_out = false;
     }
 }
 
 impl GpxState {
+    pub(crate) fn open_temp_altitude_profile(
+        &mut self,
+        title: impl Into<String>,
+        waypoints: Vec<gpx::Waypoint>,
+    ) {
+        self.temp_altitude_profile.open = true;
+        self.temp_altitude_profile.title = title.into();
+        self.temp_altitude_profile.waypoints = waypoints;
+        self.temp_altitude_profile.reset_fetch();
+    }
+
     pub(crate) fn show_altitude_profile_window(&mut self, ctx: &egui::Context) {
         let Some(segment_selection) = self.altitude_profile.selected_segment else {
             self.altitude_profile.open = false;
@@ -130,7 +158,7 @@ impl GpxState {
         };
 
         // Check if we need to start fetching elevation data
-        if !self.altitude_profile.fetch_in_progress {
+        if !self.altitude_profile.fetch_in_progress && !self.altitude_profile.fetch_attempted {
             if let Some(waypoints) = self.segment_waypoints(segment_selection) {
                 let waypoints_without_elevation = waypoints
                     .iter()
@@ -154,19 +182,22 @@ impl GpxState {
                             self.altitude_profile.elevation_results.clone(),
                         );
                         self.altitude_profile.fetch_in_progress = true;
+                        self.altitude_profile.fetch_attempted = true;
                         self.altitude_profile.fetch_start_time = Some(std::time::Instant::now());
+                        self.altitude_profile.fetch_timed_out = false;
                     }
                 }
             }
         }
 
-        // Check if fetch has timed out (5 seconds)
+        // Check if fetch has timed out (30 seconds)
         if self.altitude_profile.fetch_in_progress {
             if let Some(start_time) = self.altitude_profile.fetch_start_time {
-                if start_time.elapsed().as_secs() > 5 {
+                if start_time.elapsed().as_secs() > 30 {
                     log::warn!("Elevation fetch timed out");
                     self.altitude_profile.fetch_in_progress = false;
                     self.altitude_profile.fetch_start_time = None;
+                    self.altitude_profile.fetch_timed_out = true;
                 }
             }
         }
@@ -201,6 +232,7 @@ impl GpxState {
             }
             self.altitude_profile.fetch_in_progress = false;
             self.altitude_profile.fetch_start_time = None;
+            self.altitude_profile.fetch_timed_out = false;
         }
 
         // Now get waypoints to display
@@ -212,32 +244,31 @@ impl GpxState {
         let profile_data = extract_altitude_profile(waypoints);
 
         if profile_data.is_empty() {
-            if self.altitude_profile.fetch_in_progress {
-                // Still loading
-                let mut open = self.altitude_profile.open;
-                let window_title = format!("Profil d'altitude - Segment {}", segment_selection.1 + 1);
+            let mut open = self.altitude_profile.open;
+            let window_title = format!("Profil d'altitude - Segment {}", segment_selection.1 + 1);
 
-                egui::Window::new(window_title)
-                    .open(&mut open)
-                    .resizable(true)
-                    .default_width(600.0)
-                    .default_height(400.0)
-                    .show(ctx, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.add_space(ui.available_width() / 2.0 - 50.0);
-                            ui.label("⏳ Récupération des données d'altitude...");
-                        });
-                    });
+            egui::Window::new(window_title)
+                .open(&mut open)
+                .resizable(true)
+                .default_width(600.0)
+                .default_height(260.0)
+                .show(ctx, |ui| {
+                    if self.altitude_profile.fetch_in_progress {
+                        ui.label("⏳ Récupération des données d'altitude...");
+                    } else if self.altitude_profile.fetch_timed_out {
+                        ui.label("Le chargement a expiré.");
+                    } else if self.altitude_profile.fetch_attempted {
+                        ui.label("Aucune donnée d'altitude disponible");
+                    } else {
+                        ui.label("Prêt à charger le profil d'altitude");
+                    }
+                });
 
-                self.altitude_profile.open = open;
-                if !self.altitude_profile.open {
-                    self.altitude_profile.selected_segment = None;
-                }
-                return;
-            } else {
-                self.altitude_profile.open = false;
-                return;
+            self.altitude_profile.open = open;
+            if !self.altitude_profile.open {
+                self.altitude_profile.selected_segment = None;
             }
+            return;
         }
 
         let points: Vec<[f64; 2]> = profile_data.iter().map(|&(x, y)| [x, y]).collect();
@@ -317,7 +348,9 @@ impl GpxState {
         }
 
         // Start elevation fetch for waypoints that have no elevation
-        if !self.temp_altitude_profile.fetch_in_progress {
+        if !self.temp_altitude_profile.fetch_in_progress
+            && !self.temp_altitude_profile.fetch_attempted
+        {
             let needs_elevation = self
                 .temp_altitude_profile
                 .waypoints
@@ -338,27 +371,34 @@ impl GpxState {
 
                 if !positions.is_empty() {
                     log::info!(
-                        "Fetching elevation for {} temp segment waypoints",
-                        positions.len()
+                        "Fetching elevation for {} waypoints ({})",
+                        positions.len(),
+                        self.temp_altitude_profile.title
                     );
                     crate::elevation_service::fetch_elevation_for_positions(
                         positions,
                         self.temp_altitude_profile.elevation_results.clone(),
                     );
                     self.temp_altitude_profile.fetch_in_progress = true;
+                    self.temp_altitude_profile.fetch_attempted = true;
                     self.temp_altitude_profile.fetch_start_time =
                         Some(std::time::Instant::now());
+                    self.temp_altitude_profile.fetch_timed_out = false;
                 }
             }
         }
 
-        // Check fetch timeout (10 seconds)
+        // Check fetch timeout (30 seconds)
         if self.temp_altitude_profile.fetch_in_progress {
             if let Some(start_time) = self.temp_altitude_profile.fetch_start_time {
-                if start_time.elapsed().as_secs() > 10 {
-                    log::warn!("Temp segment elevation fetch timed out");
+                if start_time.elapsed().as_secs() > 30 {
+                    log::warn!(
+                        "Temp altitude fetch timed out ({})",
+                        self.temp_altitude_profile.title
+                    );
                     self.temp_altitude_profile.fetch_in_progress = false;
                     self.temp_altitude_profile.fetch_start_time = None;
+                    self.temp_altitude_profile.fetch_timed_out = true;
                 }
             }
         }
@@ -386,14 +426,16 @@ impl GpxState {
             }
             self.temp_altitude_profile.fetch_in_progress = false;
             self.temp_altitude_profile.fetch_start_time = None;
+            self.temp_altitude_profile.fetch_timed_out = false;
         }
 
         let profile_data = extract_altitude_profile(&self.temp_altitude_profile.waypoints);
         let fetch_in_progress = self.temp_altitude_profile.fetch_in_progress;
         let mut open = self.temp_altitude_profile.open;
+        let window_title = self.temp_altitude_profile.title.clone();
 
         if profile_data.is_empty() {
-            egui::Window::new("Profil d'altitude - Segment temporaire")
+            egui::Window::new(&window_title)
                 .open(&mut open)
                 .resizable(true)
                 .default_width(600.0)
@@ -401,6 +443,8 @@ impl GpxState {
                 .show(ctx, |ui| {
                     if fetch_in_progress {
                         ui.label("⏳ Récupération des données d'altitude...");
+                    } else if self.temp_altitude_profile.fetch_timed_out {
+                        ui.label("Le chargement a expiré.");
                     } else {
                         ui.label("Aucune donnée d'altitude disponible");
                     }
@@ -412,7 +456,7 @@ impl GpxState {
         let points: Vec<[f64; 2]> = profile_data.iter().map(|&(x, y)| [x, y]).collect();
         let line = Line::new("Profil", PlotPoints::new(points)).fill(0.0);
 
-        egui::Window::new("Profil d'altitude - Segment temporaire")
+        egui::Window::new(&window_title)
             .open(&mut open)
             .resizable(true)
             .default_width(600.0)
