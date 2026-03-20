@@ -1,7 +1,6 @@
 use super::*;
 
 use egui_plot::{Line, Plot, PlotPoints};
-use std::sync::{Arc, Mutex};
 
 use crate::elevation_service::ElevationResults;
 
@@ -59,13 +58,92 @@ fn format_altitude_tooltip(name: &str, dist_km: f64, alt_m: f64) -> String {
     }
 }
 
+fn waypoint_positions_missing_elevation(waypoints: &[gpx::Waypoint]) -> Vec<walkers::Position> {
+    waypoints
+        .iter()
+        .filter(|wp| wp.elevation.is_none())
+        .map(|wp| {
+            let point = wp.point();
+            walkers::lat_lon(point.y(), point.x())
+        })
+        .collect()
+}
+
+fn start_elevation_fetch(
+    ctx: &egui::Context,
+    title: &str,
+    waypoints: &[gpx::Waypoint],
+    sender: std::sync::mpsc::Sender<Vec<(walkers::Position, f64)>>,
+) -> Option<f64> {
+    let positions = waypoint_positions_missing_elevation(waypoints);
+    if positions.is_empty() {
+        return None;
+    }
+
+    log::info!("Fetching elevation for {} waypoints ({title})", positions.len());
+    crate::elevation_service::fetch_elevation_for_positions(positions, sender);
+    Some(ctx.input(|i| i.time))
+}
+
+fn update_fetch_timeout(
+    ctx: &egui::Context,
+    title: &str,
+    fetch_in_progress: &mut bool,
+    fetch_start_time: &mut Option<f64>,
+    fetch_timed_out: &mut bool,
+) {
+    if !*fetch_in_progress {
+        return;
+    }
+
+    ctx.request_repaint_after(std::time::Duration::from_millis(100));
+    if let Some(start_time) = *fetch_start_time {
+        if ctx.input(|i| i.time) - start_time > 30.0 {
+            log::warn!("Elevation fetch timed out ({title})");
+            *fetch_in_progress = false;
+            *fetch_start_time = None;
+            *fetch_timed_out = true;
+        }
+    }
+}
+
+fn take_fetched_elevation_lookup(
+    elevation_results: &ElevationResults,
+) -> Option<std::collections::HashMap<(u64, u64), f64>> {
+    let elevations = elevation_results.1.try_recv().ok()?;
+
+    Some(
+        elevations
+        .iter()
+        .map(|(pos, elevation)| ((pos.x().to_bits(), pos.y().to_bits()), *elevation))
+        .collect(),
+    )
+}
+
+fn apply_elevation_lookup(
+    elevation_by_pos: &std::collections::HashMap<(u64, u64), f64>,
+    waypoints: &mut [gpx::Waypoint],
+) {
+    for waypoint in waypoints {
+        if waypoint.elevation.is_some() {
+            continue;
+        }
+
+        let point = waypoint.point();
+        let wp_pos = walkers::lat_lon(point.y(), point.x());
+        waypoint.elevation = elevation_by_pos
+            .get(&(wp_pos.x().to_bits(), wp_pos.y().to_bits()))
+            .copied();
+    }
+}
+
 pub struct AltitudeProfileState {
     pub open: bool,
     pub selected_segment: Option<SegmentSelection>,
     elevation_results: ElevationResults,
     fetch_in_progress: bool,
     fetch_attempted: bool,
-    fetch_start_time: Option<std::time::Instant>,
+    fetch_start_time: Option<f64>,
     fetch_timed_out: bool,
 }
 
@@ -74,7 +152,7 @@ impl AltitudeProfileState {
         Self {
             open: false,
             selected_segment: None,
-            elevation_results: Arc::new(Mutex::new(None)),
+            elevation_results: std::sync::mpsc::channel(),
             fetch_in_progress: false,
             fetch_attempted: false,
             fetch_start_time: None,
@@ -83,7 +161,7 @@ impl AltitudeProfileState {
     }
 
     pub fn reset_fetch(&mut self) {
-        self.elevation_results = Arc::new(Mutex::new(None));
+        self.elevation_results = std::sync::mpsc::channel();
         self.fetch_in_progress = false;
         self.fetch_attempted = false;
         self.fetch_start_time = None;
@@ -104,7 +182,7 @@ pub struct TempAltitudeProfileState {
     elevation_results: ElevationResults,
     fetch_in_progress: bool,
     fetch_attempted: bool,
-    fetch_start_time: Option<std::time::Instant>,
+    fetch_start_time: Option<f64>,
     fetch_timed_out: bool,
 }
 
@@ -114,7 +192,7 @@ impl TempAltitudeProfileState {
             open: false,
             title: "Profil d'altitude - Segment temporaire".to_owned(),
             waypoints: Vec::new(),
-            elevation_results: Arc::new(Mutex::new(None)),
+            elevation_results: std::sync::mpsc::channel(),
             fetch_in_progress: false,
             fetch_attempted: false,
             fetch_start_time: None,
@@ -130,7 +208,7 @@ impl TempAltitudeProfileState {
     }
 
     pub fn reset_fetch(&mut self) {
-        self.elevation_results = Arc::new(Mutex::new(None));
+        self.elevation_results = std::sync::mpsc::channel();
         self.fetch_in_progress = false;
         self.fetch_attempted = false;
         self.fetch_start_time = None;
@@ -156,76 +234,33 @@ impl GpxState {
             return;
         };
 
-        // Check if we need to start fetching elevation data
         if !self.altitude_profile.fetch_in_progress && !self.altitude_profile.fetch_attempted {
             if let Some(waypoints) = self.segment_waypoints(segment_selection) {
-                let waypoints_without_elevation =
-                    waypoints.iter().filter(|wp| wp.elevation.is_none()).count();
-
-                if waypoints_without_elevation > 0 {
-                    // Start fetching elevation data
-                    let positions: Vec<walkers::Position> = waypoints
-                        .iter()
-                        .map(|wp| {
-                            let point = wp.point();
-                            walkers::lat_lon(point.y(), point.x())
-                        })
-                        .collect();
-
-                    if !positions.is_empty() {
-                        log::info!("Fetching elevation for {} waypoints", positions.len());
-                        crate::elevation_service::fetch_elevation_for_positions(
-                            positions,
-                            self.altitude_profile.elevation_results.clone(),
-                        );
-                        self.altitude_profile.fetch_in_progress = true;
-                        self.altitude_profile.fetch_attempted = true;
-                        self.altitude_profile.fetch_start_time = Some(std::time::Instant::now());
-                        self.altitude_profile.fetch_timed_out = false;
-                    }
+                if let Some(start_time) = start_elevation_fetch(
+                ctx,
+                "Profil d'altitude",
+                waypoints,
+                self.altitude_profile.elevation_results.0.clone(),
+                ) {
+                    self.altitude_profile.fetch_in_progress = true;
+                    self.altitude_profile.fetch_attempted = true;
+                    self.altitude_profile.fetch_start_time = Some(start_time);
+                    self.altitude_profile.fetch_timed_out = false;
                 }
             }
         }
 
-        // Check if fetch has timed out (30 seconds)
-        if self.altitude_profile.fetch_in_progress {
-            if let Some(start_time) = self.altitude_profile.fetch_start_time {
-                if start_time.elapsed().as_secs() > 30 {
-                    log::warn!("Elevation fetch timed out");
-                    self.altitude_profile.fetch_in_progress = false;
-                    self.altitude_profile.fetch_start_time = None;
-                    self.altitude_profile.fetch_timed_out = true;
-                }
-            }
-        }
+        update_fetch_timeout(
+            ctx,
+            "Profil d'altitude",
+            &mut self.altitude_profile.fetch_in_progress,
+            &mut self.altitude_profile.fetch_start_time,
+            &mut self.altitude_profile.fetch_timed_out,
+        );
 
-        // Check if elevation data has been fetched and apply it
-        let fetched_elevations = {
-            let mut results = self.altitude_profile.elevation_results.lock().ok();
-            results.as_mut().and_then(|r| r.take())
-        };
-
-        if let Some(elevations) = fetched_elevations {
-            // Apply fetched elevations to waypoints
+        if let Some(elevation_by_pos) = take_fetched_elevation_lookup(&self.altitude_profile.elevation_results) {
             if let Some(waypoints) = self.segment_waypoints_mut(segment_selection) {
-                for waypoint in waypoints {
-                    if waypoint.elevation.is_some() {
-                        continue;
-                    }
-
-                    let point = waypoint.point();
-                    let wp_pos = walkers::lat_lon(point.y(), point.x());
-
-                    // Find matching elevation
-                    for (fetched_pos, elevation) in &elevations {
-                        if (wp_pos.x() - fetched_pos.x()).abs() < 1e-6
-                            && (wp_pos.y() - fetched_pos.y()).abs() < 1e-6
-                        {
-                            waypoint.elevation = Some(*elevation);
-                            break;
-                        }
-                    }
-                }
+                apply_elevation_lookup(&elevation_by_pos, waypoints);
             }
             self.altitude_profile.fetch_in_progress = false;
             self.altitude_profile.fetch_start_time = None;
@@ -303,6 +338,11 @@ impl GpxState {
                         descent -= diff;
                     }
                 }
+                let slope_percent = if total_distance > 0.0 {
+                    (climb / (total_distance * 1000.0)) * 100.0
+                } else {
+                    0.0
+                };
 
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
@@ -314,6 +354,7 @@ impl GpxState {
                             "Élévation: {min_elevation:.0}m - {max_elevation:.0}m"
                         ));
                         ui.label(format!("Montée: {climb:.0}m | Descente: {descent:.0}m"));
+                        ui.label(format!("Pourcentage de pente: {slope_percent:.1}%"));
                     });
                 });
 
@@ -341,82 +382,34 @@ impl GpxState {
             return;
         }
 
-        // Start elevation fetch for waypoints that have no elevation
         if !self.temp_altitude_profile.fetch_in_progress
             && !self.temp_altitude_profile.fetch_attempted
         {
-            let needs_elevation = self
-                .temp_altitude_profile
-                .waypoints
-                .iter()
-                .any(|wp| wp.elevation.is_none());
-
-            if needs_elevation {
-                let positions: Vec<walkers::Position> = self
-                    .temp_altitude_profile
-                    .waypoints
-                    .iter()
-                    .filter(|wp| wp.elevation.is_none())
-                    .map(|wp| {
-                        let point = wp.point();
-                        walkers::lat_lon(point.y(), point.x())
-                    })
-                    .collect();
-
-                if !positions.is_empty() {
-                    log::info!(
-                        "Fetching elevation for {} waypoints ({})",
-                        positions.len(),
-                        self.temp_altitude_profile.title
-                    );
-                    crate::elevation_service::fetch_elevation_for_positions(
-                        positions,
-                        self.temp_altitude_profile.elevation_results.clone(),
-                    );
-                    self.temp_altitude_profile.fetch_in_progress = true;
-                    self.temp_altitude_profile.fetch_attempted = true;
-                    self.temp_altitude_profile.fetch_start_time = Some(std::time::Instant::now());
-                    self.temp_altitude_profile.fetch_timed_out = false;
-                }
+            if let Some(start_time) = start_elevation_fetch(
+                ctx,
+                &self.temp_altitude_profile.title,
+                &self.temp_altitude_profile.waypoints,
+                self.temp_altitude_profile.elevation_results.0.clone(),
+            ) {
+                self.temp_altitude_profile.fetch_in_progress = true;
+                self.temp_altitude_profile.fetch_attempted = true;
+                self.temp_altitude_profile.fetch_start_time = Some(start_time);
+                self.temp_altitude_profile.fetch_timed_out = false;
             }
         }
 
-        // Check fetch timeout (30 seconds)
-        if self.temp_altitude_profile.fetch_in_progress {
-            if let Some(start_time) = self.temp_altitude_profile.fetch_start_time {
-                if start_time.elapsed().as_secs() > 30 {
-                    log::warn!(
-                        "Temp altitude fetch timed out ({})",
-                        self.temp_altitude_profile.title
-                    );
-                    self.temp_altitude_profile.fetch_in_progress = false;
-                    self.temp_altitude_profile.fetch_start_time = None;
-                    self.temp_altitude_profile.fetch_timed_out = true;
-                }
-            }
-        }
+        update_fetch_timeout(
+            ctx,
+            &self.temp_altitude_profile.title,
+            &mut self.temp_altitude_profile.fetch_in_progress,
+            &mut self.temp_altitude_profile.fetch_start_time,
+            &mut self.temp_altitude_profile.fetch_timed_out,
+        );
 
-        // Apply fetched elevations
-        let fetched_elevations = {
-            let mut results = self.temp_altitude_profile.elevation_results.lock().ok();
-            results.as_mut().and_then(|r| r.take())
-        };
-        if let Some(elevations) = fetched_elevations {
-            for waypoint in &mut self.temp_altitude_profile.waypoints {
-                if waypoint.elevation.is_some() {
-                    continue;
-                }
-                let point = waypoint.point();
-                let wp_pos = walkers::lat_lon(point.y(), point.x());
-                for (fetched_pos, elevation) in &elevations {
-                    if (wp_pos.x() - fetched_pos.x()).abs() < 1e-6
-                        && (wp_pos.y() - fetched_pos.y()).abs() < 1e-6
-                    {
-                        waypoint.elevation = Some(*elevation);
-                        break;
-                    }
-                }
-            }
+        if let Some(elevation_by_pos) =
+            take_fetched_elevation_lookup(&self.temp_altitude_profile.elevation_results)
+        {
+            apply_elevation_lookup(&elevation_by_pos, &mut self.temp_altitude_profile.waypoints);
             self.temp_altitude_profile.fetch_in_progress = false;
             self.temp_altitude_profile.fetch_start_time = None;
             self.temp_altitude_profile.fetch_timed_out = false;
@@ -476,17 +469,22 @@ impl GpxState {
                         descent -= diff;
                     }
                 }
+                let slope_percent = if total_distance > 0.0 {
+                    (climb - descent) / (total_distance * 1000.0) * 100.0
+                } else {
+                    0.0
+                };
 
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
-                            egui::RichText::new(format!("Distance: {total_distance:.2} km"))
-                                .strong(),
+                            format!("Distance: {total_distance:.2} km"),
                         );
                         ui.label(format!(
                             "Élévation: {min_elevation:.0}m - {max_elevation:.0}m"
                         ));
                         ui.label(format!("Montée: {climb:.0}m | Descente: {descent:.0}m"));
+                        ui.label(format!("Pourcentage de pente: {slope_percent:.1}%"));
                     });
                 });
 

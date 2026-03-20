@@ -1,5 +1,6 @@
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, mpsc::Sender};
 
+use crate::task_utils::execute;
 use walkers::Position;
 
 const OPEN_TOPO_DATA_URL: &str = "https://api.opentopodata.org/v1/mapzen";
@@ -179,7 +180,10 @@ struct ElevationLocation {
     lng: f64,
 }
 
-pub type ElevationResults = Arc<Mutex<Option<Vec<(Position, f64)>>>>;
+pub type ElevationResults = (
+    Sender<Vec<(Position, f64)>>,
+    std::sync::mpsc::Receiver<Vec<(Position, f64)>>,
+);
 
 fn build_elevation_request(positions: &[Position]) -> ehttp::Request {
     let locations = positions
@@ -274,74 +278,116 @@ fn parse_elevation_response(
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+async fn yield_to_runtime() {
+    use futures::channel::oneshot;
+    use wasm_bindgen::{JsCast, closure::Closure};
+
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+
+    let (sender, receiver) = oneshot::channel();
+    let callback = Closure::once(move || {
+        let _ = sender.send(());
+    });
+
+    if window
+        .request_animation_frame(callback.as_ref().unchecked_ref())
+        .is_ok()
+    {
+        callback.forget();
+        let _ = receiver.await;
+    }
+}
+
+async fn split_offline_coverage_async(
+    positions: Vec<Position>,
+) -> (Vec<(Position, f64)>, Vec<Position>) {
+    #[cfg(target_arch = "wasm32")]
+    yield_to_runtime().await;
+
+    let Some(db) = OFFLINE_DB.get() else {
+        return (Vec::new(), positions);
+    };
+    if db.is_empty() {
+        return (Vec::new(), positions);
+    }
+
+    let mut elevations = Vec::new();
+    let mut missing = Vec::new();
+
+    #[cfg(target_arch = "wasm32")]
+    let chunk_size = 32;
+    #[cfg(not(target_arch = "wasm32"))]
+    let chunk_size = positions.len().max(1);
+
+    for chunk in positions.chunks(chunk_size) {
+        for pos in chunk {
+            if let Some(elevation) = db.elevation_at(pos.y(), pos.x()) {
+                elevations.push((*pos, elevation));
+            } else {
+                missing.push(*pos);
+            }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        yield_to_runtime().await;
+    }
+
+    (elevations, missing)
+}
+
+async fn fetch_via_api_async(positions: Vec<Position>) -> Vec<(Position, f64)> {
+    if positions.is_empty() {
+        return Vec::new();
+    }
+
+    let (sender, receiver) = futures::channel::oneshot::channel();
+    fetch_via_api(positions, move |elevations| {
+        let _ = sender.send(elevations);
+    });
+
+    receiver.await.unwrap_or_default()
+}
+
 /// Request elevation data for a list of positions.
 ///
 /// Uses the offline SRTM database when available (fast, no network).
 /// Falls back to the OpenTopoData API for any position not covered offline.
-pub fn fetch_elevation_for_positions(positions: Vec<Position>, results: ElevationResults) {
+pub fn fetch_elevation_for_positions(positions: Vec<Position>, sender: Sender<Vec<(Position, f64)>>) {
     if positions.is_empty() {
         return;
     }
 
-    // --- Offline path ---------------------------------------------------
-    if let Some(db) = OFFLINE_DB.get() {
-        if !db.is_empty() {
-            let elevations: Vec<(Position, f64)> = positions
-                .iter()
-                .filter_map(|pos| db.elevation_at(pos.y(), pos.x()).map(|e| (*pos, e)))
-                .collect();
+    let total_positions = positions.len();
+    execute(async move {
+        let (offline_elevations, missing) = split_offline_coverage_async(positions).await;
 
-            if elevations.len() == positions.len() {
-                log::debug!(
-                    "Offline elevation: resolved {} points from SRTM tiles",
-                    elevations.len()
-                );
-                if let Ok(mut lock) = results.lock() {
-                    *lock = Some(elevations);
-                }
-                return;
-            }
-
-            // Partial coverage: only forward the uncovered positions to API.
-            let covered: std::collections::HashSet<_> = elevations
-                .iter()
-                .map(|(pos, _)| (pos.x().to_bits(), pos.y().to_bits()))
-                .collect();
-            let missing: Vec<Position> = positions
-                .iter()
-                .filter(|pos| !covered.contains(&(pos.x().to_bits(), pos.y().to_bits())))
-                .copied()
-                .collect();
-            log::debug!(
-                "Offline elevation: {}/{} offline, {} need API",
-                elevations.len(),
-                positions.len(),
-                missing.len()
-            );
-            // Merge offline results with API results when API returns.
-            let offline_elevations = Arc::new(elevations);
-            let results_clone = Arc::clone(&results);
-            fetch_via_api(missing, move |api_elevations| {
-                let mut combined = (*offline_elevations).clone();
-                combined.extend(api_elevations);
-                if let Ok(mut lock) = results_clone.lock() {
-                    *lock = Some(combined);
-                }
-            });
+        if missing.is_empty() {
+            let _ = sender.send(offline_elevations);
             return;
         }
-    }
 
-    // --- API-only path --------------------------------------------------
-    log::debug!(
-        "Sending elevation request for {} waypoints",
-        positions.len()
-    );
-
-    fetch_via_api(positions, move |elevations| {
-        if let Ok(mut lock) = results.lock() {
-            *lock = Some(elevations);
+        if offline_elevations.is_empty() {
+            log::debug!(
+                "Sending API-only elevation request for {} waypoints",
+                missing.len()
+            );
+            let api_elevations = fetch_via_api_async(missing).await;
+            let _ = sender.send(api_elevations);
+            return;
         }
+
+        log::debug!(
+            "Offline elevation: {}/{} offline, {} need API",
+            offline_elevations.len(),
+            total_positions,
+            missing.len()
+        );
+        let mut combined = offline_elevations;
+        combined.extend(fetch_via_api_async(missing).await);
+        let _ = sender.send(combined);
     });
 }
 
