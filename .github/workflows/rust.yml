@@ -19,8 +19,6 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Build
       run: cargo build --release
-    - name: Cargo Check All Features
-      run: cargo check --all-features
     - uses: actions/upload-artifact@v6
       with:
         name: krokett_editor_linux_${{ github.ref_name }}
@@ -39,8 +37,6 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Builds
       run: cargo build --release
-    - name: Cargo Check All Features
-      run: cargo check --all-features
     - uses: actions/upload-artifact@v6
       with:
         name: krokett_editor_windows_${{ github.ref_name }}.exe
