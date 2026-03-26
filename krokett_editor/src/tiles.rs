@@ -8,6 +8,7 @@ use walkers::{HttpOptions, HttpTiles, Tiles};
 pub enum Provider {
     OpenStreetMap,
     IgnRandonnee25k,
+    IgnRandonnee25kPentes,
     OpenStreetMapWithGeoportal,
     MapboxStreets,
     MapboxSatellite,
@@ -38,6 +39,35 @@ impl TileSource for IgnRandonnee25k {
     fn attribution(&self) -> Attribution {
         Attribution {
             text: "IGN Rando",
+            url: "https://www.ign.fr/",
+            logo_light: None,
+            logo_dark: None,
+        }
+    }
+}
+
+struct IgnSlopeLayer;
+
+impl TileSource for IgnSlopeLayer {
+    fn tile_url(&self, tile_id: walkers::TileId) -> String {
+        format!(
+            "https://data.geopf.fr/wmts?SERVICE=WMTS\
+            &VERSION=1.0.0\
+            &REQUEST=GetTile\
+            &LAYER=GEOGRAPHICALGRIDSYSTEMS.SLOPES.MOUNTAIN\
+            &STYLE=normal\
+            &FORMAT=image/png\
+            &TILEMATRIXSET=PM\
+            &TILEMATRIX={}\
+            &TILECOL={}\
+            &TILEROW={}",
+            tile_id.zoom, tile_id.x, tile_id.y
+        )
+    }
+
+    fn attribution(&self) -> Attribution {
+        Attribution {
+            text: "IGN Pentes",
             url: "https://www.ign.fr/",
             logo_light: None,
             logo_dark: None,
@@ -94,6 +124,24 @@ pub(crate) fn providers(egui_ctx: Context) -> BTreeMap<Provider, Vec<TilesKind>>
             http_options(),
             egui_ctx.to_owned(),
         ))],
+    );
+
+    providers.insert(
+        Provider::IgnRandonnee25kPentes,
+        vec![
+            TilesKind::Http(HttpTiles::with_options(
+                IgnRandonnee25k {
+                    api_key: ign_api_key.clone(),
+                },
+                http_options(),
+                egui_ctx.to_owned(),
+            )),
+            TilesKind::Http(HttpTiles::with_options(
+                IgnSlopeLayer,
+                http_options(),
+                egui_ctx.to_owned(),
+            )),
+        ],
     );
 
     providers.insert(
