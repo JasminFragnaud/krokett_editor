@@ -62,7 +62,7 @@ impl MyApp {
 
         Self {
             providers: providers(egui_ctx.to_owned()),
-            selected_provider: Provider::IgnRandonnee25k,
+            selected_provider: Provider::IgnRandonnee25kPentes,
             map_memory: MapMemory::default(),
             gpx_state: gpx::GpxState::new(),
             dark_mode,
