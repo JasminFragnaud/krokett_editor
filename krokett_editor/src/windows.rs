@@ -180,7 +180,7 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
 
                 let can_finalize = point_count >= 2;
                 if ui
-                    .add_enabled(can_finalize, egui::Button::new("📈 Profil temporaire"))
+                    .add_enabled(can_finalize, egui::Button::new("📈 Profil"))
                     .clicked()
                 {
                     app.gpx_state.finalize_temp_segment();
@@ -190,9 +190,7 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
                     app.gpx_state.clear_drawing_segment();
                 }
 
-                ui.label(
-                    "Clic gauche carte: ajouter un point | Clic droit: annuler le dernier point",
-                );
+                ui.label("Clic gauche: +point\nClic droit: -point");
             }
 
             if app.gpx_state.waypoint_tool_enabled() {
