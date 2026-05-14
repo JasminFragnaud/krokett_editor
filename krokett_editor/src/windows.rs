@@ -173,7 +173,6 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
 
             if app.gpx_state.segment_draw_tool_enabled() {
                 let point_count = app.gpx_state.drawing_segment_points().len();
-                ui.label(format!("Points: {point_count}"));
 
                 let can_finalize = point_count >= 2;
                 if ui
