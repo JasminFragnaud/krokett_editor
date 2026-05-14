@@ -4,55 +4,13 @@ use walkers::{MapMemory, sources::Attribution};
 
 pub fn top_menu(app: &mut MyApp, ui: &mut Ui, attributions: Vec<Attribution>) {
     egui::MenuBar::new().ui(ui, |ui| {
-        ui.menu_button("Carte", |ui| {
-            ui.menu_button("Source de carte", |ui| {
-                for p in app.providers.keys() {
-                    if ui
-                        .selectable_label(app.selected_provider == *p, format!("{p:?}"))
-                        .clicked()
-                    {
-                        app.selected_provider = *p;
-                        ui.close();
-                    }
-                }
-            });
-
-            ui.label(format!("Source active : {:?}", app.selected_provider));
-
-            for attribution in attributions {
-                ui.horizontal(|ui| {
-                    if let Some(logo) = attribution.logo_light {
-                        ui.add(Image::new(logo).max_height(30.0).max_width(80.0));
-                    }
-                    ui.hyperlink_to(attribution.text, attribution.url);
-                });
+        ui.horizontal(|ui| {
+            ui.label("Sombre");
+            let mut dark_mode = app.dark_mode();
+            if ui.add(toggle_switch::toggle(&mut dark_mode)).changed() {
+                app.set_dark_mode(ui.ctx(), dark_mode);
             }
-
-            ui.separator();
-            ui.label("Déposez des fichiers .gpx sur la carte pour afficher les traces");
-            ui.label(format!("Segments GPX : {}", app.gpx_state.tracks_count()));
-
-            if app.gpx_state.cut_tool_enabled() {
-                ui.label(
-                    "Édition de segment activé:\nClic gauche : créer un nouveau segment,\nClic droit sur un séparateur : supprimer le segment",
-                );
-            }
-
-            if app.gpx_state.waypoint_tool_enabled() {
-                ui.label(
-                    "Édition de waypoint activé:\nClic gauche sur la carte : ajouter un waypoint,\nClic gauche sur un waypoint : éditer sa description",
-                );
-            }
-
-            if app.gpx_state.segment_draw_tool_enabled() {
-                ui.label(
-                    "Segment temporaire activé:\nClic gauche : ajouter un point, clic droit : annuler le dernier point,\nBouton Profil temporaire : afficher montée/descente",
-                );
-            }
-
-            if let Some(status) = app.gpx_state.status() {
-                ui.label(status);
-            }
+            ui.label("Clair");
         });
 
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -93,13 +51,55 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui, attributions: Vec<Attribution>) {
 
             ui.separator();
 
-            ui.horizontal(|ui| {
-                ui.label("Sombre");
-                let mut dark_mode = app.dark_mode();
-                if ui.add(toggle_switch::toggle(&mut dark_mode)).changed() {
-                    app.set_dark_mode(ui.ctx(), dark_mode);
+            ui.menu_button("Carte", |ui| {
+                ui.menu_button("Source de carte", |ui| {
+                    for p in app.providers.keys() {
+                        if ui
+                            .selectable_label(app.selected_provider == *p, format!("{p:?}"))
+                            .clicked()
+                        {
+                            app.selected_provider = *p;
+                            ui.close();
+                        }
+                    }
+                });
+
+                ui.label(format!("Source active : {:?}", app.selected_provider));
+
+                for attribution in attributions {
+                    ui.horizontal(|ui| {
+                        if let Some(logo) = attribution.logo_light {
+                            ui.add(Image::new(logo).max_height(30.0).max_width(80.0));
+                        }
+                        ui.hyperlink_to(attribution.text, attribution.url);
+                    });
                 }
-                ui.label("Clair");
+
+                ui.separator();
+                ui.label("Déposez des fichiers .gpx sur la carte pour afficher les traces");
+                ui.label(format!("Segments GPX : {}", app.gpx_state.tracks_count()));
+
+                if app.gpx_state.cut_tool_enabled() {
+                    ui.label(
+                        "Édition de segment activé:\nClic gauche : créer un nouveau segment,\nClic droit sur un séparateur : supprimer le segment",
+                    );
+                }
+
+                if app.gpx_state.waypoint_tool_enabled() {
+                    ui.label(
+                        "Édition de waypoint activé:\nClic gauche sur la carte : ajouter un waypoint,\nClic gauche sur un waypoint : éditer sa description",
+                    );
+                }
+
+                if app.gpx_state.segment_draw_tool_enabled() {
+                    ui.label(
+                        "Segment temporaire activé:\nClic gauche : ajouter un point, clic droit : annuler le dernier point,\nBouton Profil temporaire : afficher montée/descente",
+                    );
+                }
+
+                if let Some(status) = app.gpx_state.status() {
+                    ui.label(status);
+                }
             });
         });
     });
