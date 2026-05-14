@@ -1,9 +1,18 @@
-use crate::{MyApp, constants::WINDOW_WIDTH, toggle_switch};
-use egui::{Align, Align2, ComboBox, Image, Layout, Response, RichText, Ui, Vec2, Window};
+use crate::{MyApp, toggle_switch};
+use egui::{Align, Align2, Image, Layout, Response, RichText, Ui, Window};
 use walkers::{MapMemory, sources::Attribution};
 
-pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
+pub fn top_menu(app: &mut MyApp, ui: &mut Ui, attributions: Vec<Attribution>) {
     egui::MenuBar::new().ui(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.label("Sombre");
+            let mut dark_mode = app.dark_mode();
+            if ui.add(toggle_switch::toggle(&mut dark_mode)).changed() {
+                app.set_dark_mode(ui.ctx(), dark_mode);
+            }
+            ui.label("Clair");
+        });
+
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.menu_button("Fichier", |ui| {
                 if ui.button("Charger GPX…").clicked() {
@@ -22,7 +31,33 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
                     }
                     ui.close();
                 }
+            });
 
+            ui.menu_button("Édition", |ui| {
+                let mut cut_tool = app.gpx_state.cut_tool_enabled();
+                if ui.checkbox(&mut cut_tool, "Segments").changed() {
+                    app.gpx_state.set_cut_tool_enabled(cut_tool);
+                }
+
+                let mut waypoint_tool = app.gpx_state.waypoint_tool_enabled();
+                if ui
+                    .checkbox(&mut waypoint_tool, "Waypoints")
+                    .changed()
+                {
+                    app.gpx_state.set_waypoint_tool_enabled(waypoint_tool);
+                }
+
+                let mut segment_draw_tool = app.gpx_state.segment_draw_tool_enabled();
+                if ui
+                    .checkbox(&mut segment_draw_tool, "Profil altimétrique")
+                    .changed()
+                {
+                    app.gpx_state
+                        .set_segment_draw_tool_enabled(segment_draw_tool);
+                }
+            });
+
+            ui.menu_button("Affichage", |ui| {
                 let mut auto_fit = app.gpx_state.auto_fit_enabled();
                 if ui
                     .checkbox(&mut auto_fit, "Auto-zoom chargement GPX")
@@ -42,70 +77,58 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui) {
 
             ui.separator();
 
-            ui.horizontal(|ui| {
-                ui.label("Sombre");
-                let mut dark_mode = app.dark_mode();
-                if ui.add(toggle_switch::toggle(&mut dark_mode)).changed() {
-                    app.set_dark_mode(ui.ctx(), dark_mode);
+            ui.menu_button("Carte", |ui| {
+                ui.menu_button("Source de carte", |ui| {
+                    for p in app.providers.keys() {
+                        if ui
+                            .selectable_label(app.selected_provider == *p, format!("{p:?}"))
+                            .clicked()
+                        {
+                            app.selected_provider = *p;
+                            ui.close();
+                        }
+                    }
+                });
+
+                ui.label(format!("Source active : {:?}", app.selected_provider));
+
+                for attribution in attributions {
+                    ui.horizontal(|ui| {
+                        if let Some(logo) = attribution.logo_light {
+                            ui.add(Image::new(logo).max_height(30.0).max_width(80.0));
+                        }
+                        ui.hyperlink_to(attribution.text, attribution.url);
+                    });
                 }
-                ui.label("Clair");
+
+                ui.separator();
+                ui.label("Déposez des fichiers .gpx sur la carte pour afficher les traces");
+                ui.label(format!("Segments GPX : {}", app.gpx_state.tracks_count()));
+
+                if app.gpx_state.cut_tool_enabled() {
+                    ui.label(
+                        "Édition de segment activé:\nClic gauche : créer un nouveau segment,\nClic droit sur un séparateur : supprimer le segment",
+                    );
+                }
+
+                if app.gpx_state.waypoint_tool_enabled() {
+                    ui.label(
+                        "Édition de waypoint activé:\nClic gauche sur la carte : ajouter un waypoint,\nClic gauche sur un waypoint : éditer sa description",
+                    );
+                }
+
+                if app.gpx_state.segment_draw_tool_enabled() {
+                    ui.label(
+                        "Profil altimétrique activé:\nClic gauche : ajouter un point, clic droit : annuler le dernier point,\nBouton Profil temporaire : afficher montée/descente",
+                    );
+                }
+
+                if let Some(status) = app.gpx_state.status() {
+                    ui.label(status);
+                }
             });
         });
     });
-}
-
-pub fn map_selector(app: &mut MyApp, ui: &Ui, attributions: Vec<Attribution>) {
-    Window::new("Sélecteur de carte")
-        .collapsible(true)
-        .default_open(false)
-        .resizable(true)
-        .default_size(Vec2 { x: WINDOW_WIDTH, y: 50. })
-        .title_bar(true)
-        .anchor(Align2::LEFT_TOP, [10., 44.])
-        .show(ui.ctx(), |ui| {
-            ComboBox::from_id_salt("Source Carte")
-                .selected_text(format!("{:?}", app.selected_provider))
-                .show_ui(ui, |ui| {
-                    for p in app.providers.keys() {
-                        ui.selectable_value(&mut app.selected_provider, *p, format!("{p:?}"));
-                    }
-                });
-
-            for attribution in attributions {
-                ui.horizontal(|ui| {
-                    if let Some(logo) = attribution.logo_light {
-                        ui.add(Image::new(logo).max_height(30.0).max_width(80.0));
-                    }
-                    ui.hyperlink_to(attribution.text, attribution.url);
-                });
-            }
-
-            ui.separator();
-            ui.label("Déposez des fichiers .gpx sur la carte pour afficher les traces");
-            ui.label(format!("Segments GPX : {}", app.gpx_state.tracks_count()));
-
-            if app.gpx_state.cut_tool_enabled() {
-                ui.label(
-                    "Édition de segment activé:\nClic gauche : créer un nouveau segment,\nClic droit sur un séparateur : supprimer le segment",
-                );
-            }
-
-            if app.gpx_state.waypoint_tool_enabled() {
-                ui.label(
-                    "Édition de waypoint activé:\nClic gauche sur la carte : ajouter un waypoint,\nClic gauche sur un waypoint : éditer sa description",
-                );
-            }
-
-            if app.gpx_state.segment_draw_tool_enabled() {
-                ui.label(
-                    "Segment temporaire activé:\nClic gauche : ajouter un point, clic droit : annuler le dernier point,\nBouton Profil temporaire : afficher montée/descente",
-                );
-            }
-
-            if let Some(status) = app.gpx_state.status() {
-                ui.label(status);
-            }
-        });
 }
 
 pub fn clear_gpx_confirmation_modal(app: &mut MyApp, ctx: &egui::Context) {
@@ -146,37 +169,18 @@ pub fn large_material_button(ui: &mut Ui, text: &str) -> Response {
 }
 
 pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
+    if !app.gpx_state.segment_draw_tool_enabled() && !app.gpx_state.waypoint_tool_enabled() {
+        return;
+    }
+
     Window::new("Découpe segments")
         .collapsible(false)
         .resizable(false)
         .title_bar(false)
         .anchor(Align2::RIGHT_TOP, [-10., 44.])
         .show(ui.ctx(), |ui| {
-            let mut cut_tool = app.gpx_state.cut_tool_enabled();
-            if ui.checkbox(&mut cut_tool, "Édition de segment").changed() {
-                app.gpx_state.set_cut_tool_enabled(cut_tool);
-            }
-
-            let mut waypoint_tool = app.gpx_state.waypoint_tool_enabled();
-            if ui
-                .checkbox(&mut waypoint_tool, "Édition de waypoint")
-                .changed()
-            {
-                app.gpx_state.set_waypoint_tool_enabled(waypoint_tool);
-            }
-
-            let mut segment_draw_tool = app.gpx_state.segment_draw_tool_enabled();
-            if ui
-                .checkbox(&mut segment_draw_tool, "Segment temporaire")
-                .changed()
-            {
-                app.gpx_state
-                    .set_segment_draw_tool_enabled(segment_draw_tool);
-            }
-
             if app.gpx_state.segment_draw_tool_enabled() {
                 let point_count = app.gpx_state.drawing_segment_points().len();
-                ui.label(format!("Points: {point_count}"));
 
                 let can_finalize = point_count >= 2;
                 if ui

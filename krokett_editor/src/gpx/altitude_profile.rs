@@ -193,7 +193,7 @@ impl TempAltitudeProfileState {
     pub fn new() -> Self {
         Self {
             open: false,
-            title: "Profil d'altitude - Segment temporaire".to_owned(),
+            title: "Profil altimétrique".to_owned(),
             waypoints: Vec::new(),
             elevation_results: std::sync::mpsc::channel(),
             fetch_in_progress: false,
@@ -205,7 +205,7 @@ impl TempAltitudeProfileState {
 
     pub fn close(&mut self) {
         self.open = false;
-        self.title = "Profil d'altitude - Segment temporaire".to_owned();
+        self.title = "Profil altimétrique".to_owned();
         self.waypoints.clear();
         self.reset_fetch();
     }
