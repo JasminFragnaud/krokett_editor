@@ -1,11 +1,58 @@
 #[cfg(target_os = "android")]
-use jni::objects::{JByteArray, JClass, JObject, JString};
-
-#[cfg(target_os = "android")]
 use egui_winit::winit::platform::android::activity::AndroidApp;
 
 #[cfg(target_os = "android")]
+use eframe::egui::Ui;
+
+#[cfg(target_os = "android")]
 use std::time::Duration;
+
+// Helper to convert JObject to String via JNI
+#[cfg(target_os = "android")]
+unsafe fn jobject_to_string(
+    env_ptr: *mut jni_sys::JNIEnv,
+    obj: jni_sys::jobject,
+) -> Option<String> {
+    if obj.is_null() {
+        return None;
+    }
+
+    let env = &**env_ptr;
+    let jstring = obj as jni_sys::jstring;
+    let cstr = (env.v1_1.GetStringUTFChars)(env_ptr, jstring, std::ptr::null_mut());
+    if cstr.is_null() {
+        return None;
+    }
+
+    let result = std::ffi::CStr::from_ptr(cstr).to_string_lossy().to_string();
+    (env.v1_1.ReleaseStringUTFChars)(env_ptr, jstring, cstr);
+    Some(result)
+}
+
+// Helper to convert JObject to byte array via JNI
+#[cfg(target_os = "android")]
+unsafe fn jobject_to_bytes(
+    env_ptr: *mut jni_sys::JNIEnv,
+    obj: jni_sys::jobject,
+) -> Option<Vec<u8>> {
+    if obj.is_null() {
+        return None;
+    }
+
+    let env = &**env_ptr;
+    let jarray = obj as jni_sys::jbyteArray;
+    let len = (env.v1_1.GetArrayLength)(env_ptr, jarray as jni_sys::jarray) as usize;
+
+    let buf = (env.v1_1.GetByteArrayElements)(env_ptr, jarray, std::ptr::null_mut());
+    if buf.is_null() {
+        return None;
+    }
+
+    let slice = std::slice::from_raw_parts(buf as *const u8, len);
+    let result = slice.to_vec();
+    (env.v1_1.ReleaseByteArrayElements)(env_ptr, jarray, buf, 0);
+    Some(result)
+}
 
 #[cfg(target_os = "android")]
 struct AndroidTextInputWorkaroundApp {
@@ -76,8 +123,8 @@ impl AndroidTextInputWorkaroundApp {
 
 #[cfg(target_os = "android")]
 impl eframe::App for AndroidTextInputWorkaroundApp {
-    fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
-        self.inner.update(ctx, frame);
+    fn ui(&mut self, ctx: &mut Ui, frame: &mut eframe::Frame) {
+        self.inner.ui(ctx, frame);
 
         // Keep a small repaint cadence only while IME text editing is active.
         if self.ime_active {
@@ -92,7 +139,9 @@ impl eframe::App for AndroidTextInputWorkaroundApp {
     ) {
         self.inner.raw_input_hook(ctx, raw_input);
 
-        if !ctx.wants_keyboard_input() {
+        #[allow(deprecated)]
+        let wants_input = ctx.wants_keyboard_input();
+        if !wants_input {
             self.ime_active = false;
             return;
         }
@@ -200,92 +249,60 @@ pub unsafe extern "system" fn Java_com_github_khep_krokett_1editor_MainActivity_
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "system" fn Java_com_github_khep_krokett_1editor_MainActivity_nativeOnGpxOpened(
-    mut env: jni::JNIEnv,
-    _class: JClass,
-    name_obj: JObject,
-    data_obj: JObject,
-    error_obj: JObject,
+    env: *mut jni_sys::JNIEnv,
+    _class: jni_sys::jclass,
+    name_obj: jni_sys::jobject,
+    data_obj: jni_sys::jobject,
+    error_obj: jni_sys::jobject,
 ) {
-    let name = if name_obj.is_null() {
-        None
-    } else {
-        env.get_string(&JString::from(name_obj))
-            .ok()
-            .map(|s| s.into())
-    };
-
-    let data = if data_obj.is_null() {
-        None
-    } else {
-        env.convert_byte_array(JByteArray::from(data_obj)).ok()
-    };
-
-    let error = if error_obj.is_null() {
-        None
-    } else {
-        env.get_string(&JString::from(error_obj))
-            .ok()
-            .map(|s| s.into())
-    };
-
-    krokett_editor::android_intent_io::push_open_result(name, data, error);
+    unsafe {
+        let name = jobject_to_string(env, name_obj);
+        let data = jobject_to_bytes(env, data_obj);
+        let error = jobject_to_string(env, error_obj);
+        krokett_editor::android_intent_io::push_open_result(name, data, error);
+    }
 }
 
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "system" fn Java_com_github_khep_krokett_1editor_MainActivity_nativeOnGpxSaved(
-    mut env: jni::JNIEnv,
-    _class: JClass,
-    file_name_obj: JObject,
-    error_obj: JObject,
+    env: *mut jni_sys::JNIEnv,
+    _class: jni_sys::jclass,
+    file_name_obj: jni_sys::jobject,
+    error_obj: jni_sys::jobject,
 ) {
-    let file_name = if file_name_obj.is_null() {
-        None
-    } else {
-        env.get_string(&JString::from(file_name_obj))
-            .ok()
-            .map(|s| s.into())
-    };
-
-    let error = if error_obj.is_null() {
-        None
-    } else {
-        env.get_string(&JString::from(error_obj))
-            .ok()
-            .map(|s| s.into())
-    };
-
-    krokett_editor::android_intent_io::push_save_result(file_name, error);
+    unsafe {
+        let file_name = jobject_to_string(env, file_name_obj);
+        let error = jobject_to_string(env, error_obj);
+        krokett_editor::android_intent_io::push_save_result(file_name, error);
+    }
 }
 
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "system" fn Java_com_github_khep_krokett_1editor_MainActivity_nativeOnLocationUpdated(
-    mut env: jni::JNIEnv,
-    _class: JClass,
+    env: *mut jni_sys::JNIEnv,
+    _class: jni_sys::jclass,
     latitude: jni_sys::jdouble,
     longitude: jni_sys::jdouble,
-    error_obj: JObject,
+    error_obj: jni_sys::jobject,
 ) {
-    let error = if error_obj.is_null() {
-        None
-    } else {
-        env.get_string(&JString::from(error_obj))
-            .ok()
-            .map(|s| s.into())
-    };
-
-    let latitude = if latitude.is_nan() {
-        None
-    } else {
-        Some(latitude as f64)
-    };
-
-    let longitude = if longitude.is_nan() {
-        None
-    } else {
-        Some(longitude as f64)
-    };
-
-    krokett_editor::geolocation::push_android_location_result(latitude, longitude, error);
+    unsafe {
+        let error = jobject_to_string(env, error_obj);
+        let latitude_opt = if latitude.is_nan() {
+            None
+        } else {
+            Some(latitude as f64)
+        };
+        let longitude_opt = if longitude.is_nan() {
+            None
+        } else {
+            Some(longitude as f64)
+        };
+        krokett_editor::geolocation::push_android_location_result(
+            latitude_opt,
+            longitude_opt,
+            error,
+        );
+    }
 }
