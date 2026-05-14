@@ -25,7 +25,7 @@ impl GpxState {
         }
 
         let mut open = self.tree_window_visible;
-        let default_pos = ctx.available_rect().left_top() + egui::vec2(10., 200.0);
+        let default_pos = ctx.content_rect().left_top() + egui::vec2(10., 200.0);
         egui::Window::new("GPXs")
             .open(&mut open)
             .default_open(false)
@@ -116,18 +116,18 @@ impl GpxState {
                                 file_visible = false;
                                 break;
                             }
-                            if let Some(segment_count) = self.segment_count(track_selection) {
-                                if (0..segment_count).any(|segment_index| {
+                            if let Some(segment_count) = self.segment_count(track_selection)
+                                && (0..segment_count).any(|segment_index| {
                                     let selection = (track_selection, segment_index);
                                     let description = self.segment_description(selection);
                                     let comment = self.segment_comment(selection);
                                     let matches_filter =
                                         self.segment_matches_active_filters(&description, &comment);
                                     !(self.is_segment_visible(selection) && matches_filter)
-                                }) {
-                                    file_visible = false;
-                                    break;
-                                }
+                                })
+                            {
+                                file_visible = false;
+                                break;
                             }
                         }
 

@@ -116,11 +116,11 @@ impl GpxState {
 
         if imported_segments > 0 {
             self.pending_gpx_fit = imported_bounds;
-            if self.auto_fit_enabled {
-                if let Some(bounds) = self.pending_gpx_fit {
-                    self.fit_map_to_bounds(bounds, ctx.content_rect().size(), map_memory);
-                    self.pending_gpx_fit = None;
-                }
+            if self.auto_fit_enabled
+                && let Some(bounds) = self.pending_gpx_fit
+            {
+                self.fit_map_to_bounds(bounds, ctx.content_rect().size(), map_memory);
+                self.pending_gpx_fit = None;
             }
             ctx.request_repaint();
         }
@@ -149,13 +149,9 @@ impl GpxState {
 
             let result = if let Some(bytes) = file.bytes.as_ref() {
                 self.load_gpx_from_bytes(&file_name, bytes.as_ref())
-            } else if file.path.is_some() {
+            } else if let Some(path) = &file.path {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
-                    let path = file
-                        .path
-                        .as_ref()
-                        .expect("file.path.is_some() checked above");
                     match std::fs::read(path) {
                         Ok(bytes) => self.load_gpx_from_bytes(&file_name, &bytes),
                         Err(err) => Err(format!("Impossible de lire {} : {err}", path.display())),
@@ -218,10 +214,10 @@ impl GpxState {
         viewport_size: egui::Vec2,
         map_memory: &mut MapMemory,
     ) {
-        if self.auto_fit_enabled {
-            if let Some(bounds) = self.pending_gpx_fit.take() {
-                self.fit_map_to_bounds(bounds, viewport_size, map_memory);
-            }
+        if self.auto_fit_enabled
+            && let Some(bounds) = self.pending_gpx_fit.take()
+        {
+            self.fit_map_to_bounds(bounds, viewport_size, map_memory);
         }
     }
 }

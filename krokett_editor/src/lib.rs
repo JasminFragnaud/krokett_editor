@@ -23,7 +23,7 @@ use crate::{
     windows::{clear_gpx_confirmation_modal, cut_tool_controls, map_selector, zoom},
 };
 use anyhow::Result;
-use egui::{CentralPanel, Context, Frame, Theme, TopBottomPanel, Visuals};
+use egui::{CentralPanel, Context, Frame, Panel, Theme, Visuals};
 use tiles::{Provider, TilesKind, providers};
 use walkers::{Map, MapMemory};
 
@@ -50,9 +50,9 @@ impl MyApp {
         let dark_mode = egui_ctx
             .system_theme()
             .map(|theme| matches!(theme, Theme::Dark))
-            .unwrap_or_else(|| egui_ctx.style().visuals.dark_mode);
+            .unwrap_or_else(|| egui_ctx.global_style().visuals.dark_mode);
         if dark_mode {
-            egui_ctx.set_style(style::amoled_friendly());
+            egui_ctx.set_global_style(style::amoled_friendly());
         } else {
             egui_ctx.set_visuals(Self::light_visuals_with_black_text());
         }
@@ -80,7 +80,7 @@ impl MyApp {
     pub(crate) fn set_dark_mode(&mut self, ctx: &egui::Context, dark_mode: bool) {
         self.dark_mode = dark_mode;
         if dark_mode {
-            ctx.set_style(style::amoled_friendly());
+            ctx.set_global_style(style::amoled_friendly());
         } else {
             ctx.set_visuals(Self::light_visuals_with_black_text());
         }
@@ -207,84 +207,87 @@ impl MyApp {
 }
 
 impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         #[cfg(target_os = "android")]
-        self.handle_android_intent_results(ctx);
+        self.handle_android_intent_results(ui);
 
-        self.load_gpx_from_disk(ctx);
+        self.load_gpx_from_disk(ui);
         self.handle_save_gpx_result();
         self.geolocation.update();
 
         self.gpx_state
-            .handle_dropped_files(ctx, &mut self.map_memory);
+            .handle_dropped_files(ui, &mut self.map_memory);
 
-        TopBottomPanel::top("main_menu").show(ctx, |ui| {
+        Panel::top("main_menu").show_inside(ui, |ui| {
             windows::top_menu(self, ui);
         });
 
-        self.gpx_state.show_tree_window(ctx);
+        self.gpx_state.show_tree_window(ui);
 
-        CentralPanel::default().frame(Frame::NONE).show(ctx, |ui| {
-            self.gpx_state
-                .apply_pending_fit(ui.available_size(), &mut self.map_memory);
+        CentralPanel::default()
+            .frame(Frame::NONE)
+            .show_inside(ui, |ui| {
+                self.gpx_state
+                    .apply_pending_fit(ui.available_size(), &mut self.map_memory);
 
-            let my_position = self.geolocation.position().unwrap_or_else(places::amancy);
+                let my_position = self.geolocation.position().unwrap_or_else(places::amancy);
 
-            let tiles = self.providers.get_mut(&self.selected_provider).unwrap();
-            let attributions: Vec<_> = tiles
-                .iter()
-                .map(|tile| tile.as_ref().attribution())
-                .collect();
+                let tiles = self.providers.get_mut(&self.selected_provider).unwrap();
+                let attributions: Vec<_> = tiles
+                    .iter()
+                    .map(|tile| tile.as_ref().attribution())
+                    .collect();
 
-            let mut map = Map::new(None, &mut self.map_memory, my_position).zoom_with_ctrl(false);
+                let mut map =
+                    Map::new(None, &mut self.map_memory, my_position).zoom_with_ctrl(false);
 
-            let (
-                map_with_plugins,
-                clicked_track,
-                clicked_segment,
-                clicked_waypoint,
-                cut_request,
-                remove_request,
-                add_waypoint_request,
-                draw_segment_action,
-            ) = self.gpx_state.add_plugins(map);
-            map = map_with_plugins;
+                let (
+                    map_with_plugins,
+                    clicked_track,
+                    clicked_segment,
+                    clicked_waypoint,
+                    cut_request,
+                    remove_request,
+                    add_waypoint_request,
+                    draw_segment_action,
+                ) = self.gpx_state.add_plugins(map);
+                map = map_with_plugins;
 
-            if self.geolocation.has_position() {
-                map = map.with_plugin(position_indicator::PositionIndicator {
-                    position: my_position,
-                });
-            }
+                if self.geolocation.has_position() {
+                    map = map.with_plugin(position_indicator::PositionIndicator {
+                        position: my_position,
+                    });
+                }
 
-            for (n, tiles) in tiles.iter_mut().enumerate() {
-                let transparency = if n == 0 { 1.0 } else { 0.25 };
-                map = map.with_layer(tiles.as_mut(), transparency);
-            }
+                for (n, tiles) in tiles.iter_mut().enumerate() {
+                    let transparency = if n == 0 { 1.0 } else { 0.25 };
+                    map = map.with_layer(tiles.as_mut(), transparency);
+                }
 
-            ui.add(map);
-            self.gpx_state.consume_track_click(clicked_track);
-            self.gpx_state.consume_segment_click(clicked_segment);
-            self.gpx_state.consume_waypoint_click(clicked_waypoint);
-            self.gpx_state.consume_cut_request(cut_request);
-            self.gpx_state.consume_remove_request(remove_request);
-            self.gpx_state
-                .consume_add_waypoint_request(add_waypoint_request);
-            self.gpx_state
-                .consume_draw_segment_action(draw_segment_action);
+                ui.add(map);
+                self.gpx_state.consume_track_click(clicked_track);
+                self.gpx_state.consume_segment_click(clicked_segment);
+                self.gpx_state.consume_waypoint_click(clicked_waypoint);
+                self.gpx_state.consume_cut_request(cut_request);
+                self.gpx_state.consume_remove_request(remove_request);
+                self.gpx_state
+                    .consume_add_waypoint_request(add_waypoint_request);
+                self.gpx_state
+                    .consume_draw_segment_action(draw_segment_action);
 
-            {
-                cut_tool_controls(self, ui);
-                zoom(ui, &mut self.map_memory);
-                map_selector(self, ui, attributions);
-            }
-        });
+                {
+                    cut_tool_controls(self, ui);
+                    zoom(ui, &mut self.map_memory);
+                    map_selector(self, ui, attributions);
+                }
+            });
 
-        self.gpx_state.show_metadata_editor_window(ctx);
-        self.gpx_state.show_segment_editor_window(ctx);
-        self.gpx_state.show_waypoint_editor_window(ctx);
-        self.gpx_state.show_altitude_profile_window(ctx);
-        self.gpx_state.show_temp_altitude_profile_window(ctx);
-        clear_gpx_confirmation_modal(self, ctx);
-        self.gpx_state.show_toast(ctx);
+        self.gpx_state.show_metadata_editor_window(ui);
+        self.gpx_state.show_segment_editor_window(ui);
+        self.gpx_state.show_waypoint_editor_window(ui);
+        self.gpx_state.show_altitude_profile_window(ui);
+        self.gpx_state.show_temp_altitude_profile_window(ui);
+        clear_gpx_confirmation_modal(self, ui);
+        self.gpx_state.show_toast(ui);
     }
 }

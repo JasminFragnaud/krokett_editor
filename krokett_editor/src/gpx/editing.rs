@@ -128,10 +128,10 @@ impl GpxState {
         let mut right_waypoints = right_segment.points;
         if let (Some(left_last), Some(right_first)) =
             (merged_waypoints.last(), right_waypoints.first())
+            && left_last.point() == right_first.point()
+            && !right_waypoints.is_empty()
         {
-            if left_last.point() == right_first.point() && !right_waypoints.is_empty() {
-                right_waypoints.remove(0);
-            }
+            right_waypoints.remove(0);
         }
         merged_waypoints.extend(right_waypoints);
 

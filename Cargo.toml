@@ -7,9 +7,9 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-walkers = "0.52.0"
+walkers = "0.53.0"
 log = "0.4.29"
-egui = "0.33.3"
-egui_extras = { version = "0.33.3", features = ["svg"] }
-eframe = "0.33.3"
-egui-winit = "0.33.3"
+egui = "0.34.2"
+egui_extras = { version = "0.34.2", features = ["svg"] }
+eframe = "0.34.2"
+egui-winit = "0.34.2"
