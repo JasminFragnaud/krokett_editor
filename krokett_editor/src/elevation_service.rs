@@ -196,12 +196,15 @@ fn build_elevation_request(positions: &[Position]) -> ehttp::Request {
 
     #[cfg(target_arch = "wasm32")]
     {
+        use ehttp::{Credentials, Method, Mode};
         let mut request = ehttp::Request {
             url: OPEN_TOPO_DATA_URL.to_string(),
-            method: "POST".to_string(),
+            method: Method::POST,
             body: request_body.into_bytes(),
             headers: Default::default(),
-            mode: Default::default(),
+            mode: Mode::default(),
+            credentials: Credentials::default(),
+            timeout: Some(std::time::Duration::from_secs(10)),
         };
         request
             .headers
@@ -211,11 +214,14 @@ fn build_elevation_request(positions: &[Position]) -> ehttp::Request {
 
     #[cfg(not(target_arch = "wasm32"))]
     {
+        use ehttp::Method;
+
         let mut request = ehttp::Request {
             url: OPEN_TOPO_DATA_URL.to_string(),
-            method: "POST".to_string(),
+            method: Method::POST,
             body: request_body.into_bytes(),
             headers: Default::default(),
+            timeout: Some(std::time::Duration::from_secs(10)),
         };
         request
             .headers

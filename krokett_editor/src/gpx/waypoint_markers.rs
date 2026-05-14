@@ -94,30 +94,27 @@ impl Plugin for GpxWaypointMarkers {
             draw_pin(ui.painter(), tip, highlighted);
         }
 
-        if let Some(hovered_selection) = hovered {
-            if let Some((_, position, description)) = self
+        if let Some(hovered_selection) = hovered
+            && let Some((_, position, description)) = self
                 .waypoints
                 .iter()
                 .find(|(selection, _, _)| *selection == hovered_selection)
-            {
-                if !description.trim().is_empty() {
-                    let tip = projector.project(*position).to_pos2();
-                    let tooltip_pos =
-                        pin_body_center(tip) + egui::vec2(0.0, -PIN_BODY_RADIUS - 4.0);
-                    let tooltip_id = egui::Id::new(("waypoint_desc", hovered_selection));
-                    let mut tooltip = egui::Tooltip::always_open(
-                        ui.ctx().clone(),
-                        response.layer_id,
-                        tooltip_id,
-                        egui::PopupAnchor::Position(tooltip_pos),
-                    )
-                    .gap(2.0);
-                    tooltip.popup = tooltip.popup.align(egui::RectAlign::TOP);
-                    tooltip.show(|ui| {
-                        ui.label(description);
-                    });
-                }
-            }
+            && !description.trim().is_empty()
+        {
+            let tip = projector.project(*position).to_pos2();
+            let tooltip_pos = pin_body_center(tip) + egui::vec2(0.0, -PIN_BODY_RADIUS - 4.0);
+            let tooltip_id = egui::Id::new(("waypoint_desc", hovered_selection));
+            let mut tooltip = egui::Tooltip::always_open(
+                ui.ctx().clone(),
+                response.layer_id,
+                tooltip_id,
+                egui::PopupAnchor::Position(tooltip_pos),
+            )
+            .gap(2.0);
+            tooltip.popup = tooltip.popup.align(egui::RectAlign::TOP);
+            tooltip.show(|ui| {
+                ui.label(description);
+            });
         }
 
         if response.clicked_by(PointerButton::Primary) {

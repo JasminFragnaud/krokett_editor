@@ -245,19 +245,18 @@ impl GpxState {
                     .gpx_documents
                     .get_mut(file_index)
                     .map(|document| &mut document.waypoints)
+                    && waypoint_index < waypoints.len()
                 {
-                    if waypoint_index < waypoints.len() {
-                        waypoints.remove(waypoint_index);
-                        self.status = Some("Waypoint supprimé".to_owned());
-                        self.toasts.success("Waypoint supprimé");
+                    waypoints.remove(waypoint_index);
+                    self.status = Some("Waypoint supprimé".to_owned());
+                    self.toasts.success("Waypoint supprimé");
 
-                        if waypoints.is_empty() {
-                            self.selected_waypoint = None;
-                            self.waypoint_editor_open = false;
-                        } else {
-                            let next_index = waypoint_index.min(waypoints.len() - 1);
-                            self.selected_waypoint = Some((file_index, next_index));
-                        }
+                    if waypoints.is_empty() {
+                        self.selected_waypoint = None;
+                        self.waypoint_editor_open = false;
+                    } else {
+                        let next_index = waypoint_index.min(waypoints.len() - 1);
+                        self.selected_waypoint = Some((file_index, next_index));
                     }
                 }
                 self.waypoint_delete_confirm_open = false;
@@ -274,17 +273,16 @@ impl GpxState {
             .gpx_documents
             .get_mut(file_index)
             .map(|document| &mut document.waypoints)
+            && let Some(waypoint) = waypoints.get_mut(waypoint_index)
         {
-            if let Some(waypoint) = waypoints.get_mut(waypoint_index) {
-                waypoint.description = if description.trim().is_empty() {
-                    None
-                } else {
-                    Some(description)
-                };
+            waypoint.description = if description.trim().is_empty() {
+                None
+            } else {
+                Some(description)
+            };
 
-                if waypoint.time.is_none() {
-                    waypoint.time = Some(OffsetDateTime::now_utc().into());
-                }
+            if waypoint.time.is_none() {
+                waypoint.time = Some(OffsetDateTime::now_utc().into());
             }
         }
 

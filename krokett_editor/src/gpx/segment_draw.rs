@@ -91,20 +91,20 @@ impl Plugin for SegmentDrawPlugin {
         }
 
         // Left click: add anchor point
-        if response.clicked_by(PointerButton::Primary) {
-            if let Some(pointer_pos) = response.interact_pointer_pos() {
-                let map_pos = projector.unproject(pointer_pos.to_vec2());
-                if let Ok(mut action) = self.draw_action.lock() {
-                    *action = Some(DrawSegmentAction::AddPoint(map_pos));
-                }
+        if response.clicked_by(PointerButton::Primary)
+            && let Some(pointer_pos) = response.interact_pointer_pos()
+        {
+            let map_pos = projector.unproject(pointer_pos.to_vec2());
+            if let Ok(mut action) = self.draw_action.lock() {
+                *action = Some(DrawSegmentAction::AddPoint(map_pos));
             }
         }
 
         // Right click: undo last anchor point
-        if response.clicked_by(PointerButton::Secondary) {
-            if let Ok(mut action) = self.draw_action.lock() {
-                *action = Some(DrawSegmentAction::UndoLast);
-            }
+        if response.clicked_by(PointerButton::Secondary)
+            && let Ok(mut action) = self.draw_action.lock()
+        {
+            *action = Some(DrawSegmentAction::UndoLast);
         }
     }
 }

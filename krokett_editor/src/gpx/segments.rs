@@ -81,14 +81,14 @@ impl GpxState {
         selection: SegmentSelection,
         description: String,
     ) {
-        if let Some(waypoints) = self.segment_waypoints_mut(selection) {
-            if let Some(first) = waypoints.first_mut() {
-                first.description = if description.trim().is_empty() {
-                    None
-                } else {
-                    Some(description)
-                };
-            }
+        if let Some(waypoints) = self.segment_waypoints_mut(selection)
+            && let Some(first) = waypoints.first_mut()
+        {
+            first.description = if description.trim().is_empty() {
+                None
+            } else {
+                Some(description)
+            };
         }
     }
 
@@ -100,14 +100,14 @@ impl GpxState {
     }
 
     pub(super) fn set_segment_comment(&mut self, selection: SegmentSelection, comment: String) {
-        if let Some(waypoints) = self.segment_waypoints_mut(selection) {
-            if let Some(first) = waypoints.first_mut() {
-                first.comment = if comment.trim().is_empty() {
-                    None
-                } else {
-                    Some(comment)
-                };
-            }
+        if let Some(waypoints) = self.segment_waypoints_mut(selection)
+            && let Some(first) = waypoints.first_mut()
+        {
+            first.comment = if comment.trim().is_empty() {
+                None
+            } else {
+                Some(comment)
+            };
         }
     }
 

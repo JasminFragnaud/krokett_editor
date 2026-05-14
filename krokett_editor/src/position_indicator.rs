@@ -26,7 +26,7 @@ impl Plugin for PositionIndicator {
         ui.painter().text(
             center + egui::vec2(0.0, ICON_VISUAL_OFFSET_Y),
             Align2::CENTER_CENTER,
-            egui_material_icons::icons::ICON_MY_LOCATION,
+            egui_material_icons::icons::ICON_MY_LOCATION.codepoint,
             FontId::proportional(25.0),
             Color32::BLACK,
         );

@@ -86,25 +86,21 @@ fn merge_left_index_from_separator_click(
     const CLICK_DISTANCE: f32 = 8.0;
     let mut closest: Option<(usize, f32)> = None;
 
-    if has_previous_separator {
-        if let Some(first) = positions.first() {
-            let first_projected = projector.project(*first).to_pos2();
-            let distance = pointer.distance(first_projected);
-            if distance <= CLICK_DISTANCE {
-                closest = Some((segment_index - 1, distance));
-            }
+    if has_previous_separator && let Some(first) = positions.first() {
+        let first_projected = projector.project(*first).to_pos2();
+        let distance = pointer.distance(first_projected);
+        if distance <= CLICK_DISTANCE {
+            closest = Some((segment_index - 1, distance));
         }
     }
 
-    if has_next_separator {
-        if let Some(last) = positions.last() {
-            let last_projected = projector.project(*last).to_pos2();
-            let distance = pointer.distance(last_projected);
-            if distance <= CLICK_DISTANCE {
-                match closest {
-                    Some((_, best_distance)) if distance >= best_distance => {}
-                    _ => closest = Some((segment_index, distance)),
-                }
+    if has_next_separator && let Some(last) = positions.last() {
+        let last_projected = projector.project(*last).to_pos2();
+        let distance = pointer.distance(last_projected);
+        if distance <= CLICK_DISTANCE {
+            match closest {
+                Some((_, best_distance)) if distance >= best_distance => {}
+                _ => closest = Some((segment_index, distance)),
             }
         }
     }
@@ -214,49 +210,44 @@ impl Plugin for GpxPolyline {
             }
         }
 
-        if response.clicked_by(PointerButton::Secondary) {
-            if let Some(pointer_pos) = response.interact_pointer_pos() {
-                if !self.cut_tool_enabled
-                    && !self.draw_mode_enabled
-                    && pointer_hits_polyline(pointer_pos, &self.positions, projector)
-                {
-                    if let Ok(mut clicked) = self.clicked_track.lock() {
-                        *clicked = Some(self.track_selection);
-                    }
-                }
-            }
+        if response.clicked_by(PointerButton::Secondary)
+            && let Some(pointer_pos) = response.interact_pointer_pos()
+            && !self.cut_tool_enabled
+            && !self.draw_mode_enabled
+            && pointer_hits_polyline(pointer_pos, &self.positions, projector)
+            && let Ok(mut clicked) = self.clicked_track.lock()
+        {
+            *clicked = Some(self.track_selection);
         }
 
-        if response.clicked_by(PointerButton::Primary) {
-            if let Some(pointer_pos) = response.interact_pointer_pos() {
-                if self.draw_mode_enabled {
-                    // In draw mode, clicks are handled exclusively by SegmentDrawPlugin
-                } else if self.cut_tool_enabled {
-                    if let Some(left_index) = merge_left_index_from_separator_click(
-                        pointer_pos,
-                        &self.positions,
-                        projector,
-                        self.segment_index,
-                        self.has_previous_separator,
-                        self.has_next_separator,
-                    ) {
-                        if let Ok(mut remove) = self.remove_request.lock() {
-                            *remove = Some((self.track_selection, left_index));
-                        }
-                    } else if pointer_hits_polyline(pointer_pos, &self.positions, projector) {
-                        if let Some(split_idx) =
-                            nearest_segment_split_index(pointer_pos, &self.positions, projector)
-                        {
-                            if let Ok(mut cut) = self.cut_request.lock() {
-                                *cut = Some((self.track_selection, self.segment_index, split_idx));
-                            }
-                        }
+        if response.clicked_by(PointerButton::Primary)
+            && let Some(pointer_pos) = response.interact_pointer_pos()
+        {
+            if self.draw_mode_enabled {
+                // In draw mode, clicks are handled exclusively by SegmentDrawPlugin
+            } else if self.cut_tool_enabled {
+                if let Some(left_index) = merge_left_index_from_separator_click(
+                    pointer_pos,
+                    &self.positions,
+                    projector,
+                    self.segment_index,
+                    self.has_previous_separator,
+                    self.has_next_separator,
+                ) {
+                    if let Ok(mut remove) = self.remove_request.lock() {
+                        *remove = Some((self.track_selection, left_index));
                     }
-                } else if pointer_hits_polyline(pointer_pos, &self.positions, projector) {
-                    if let Ok(mut clicked) = self.clicked_segment.lock() {
-                        *clicked = Some((self.track_selection, self.segment_index));
-                    }
+                } else if pointer_hits_polyline(pointer_pos, &self.positions, projector)
+                    && let Some(split_idx) =
+                        nearest_segment_split_index(pointer_pos, &self.positions, projector)
+                    && let Ok(mut cut) = self.cut_request.lock()
+                {
+                    *cut = Some((self.track_selection, self.segment_index, split_idx));
                 }
+            } else if pointer_hits_polyline(pointer_pos, &self.positions, projector)
+                && let Ok(mut clicked) = self.clicked_segment.lock()
+            {
+                *clicked = Some((self.track_selection, self.segment_index));
             }
         }
     }

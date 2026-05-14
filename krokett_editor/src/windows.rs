@@ -202,10 +202,10 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
                     ),
                 );
 
-                if response.clicked() {
-                    if let Some(position) = current_position {
-                        app.gpx_state.add_waypoint_at_current_position(position);
-                    }
+                if response.clicked()
+                    && let Some(position) = current_position
+                {
+                    app.gpx_state.add_waypoint_at_current_position(position);
                 }
 
                 if current_position.is_none() {

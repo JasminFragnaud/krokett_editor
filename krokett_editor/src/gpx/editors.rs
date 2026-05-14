@@ -40,18 +40,17 @@ impl GpxState {
 
         self.set_track_metadata(track_selection, track_name, track_description);
 
-        if open_track_profile {
-            if let Some(waypoints) = self.track_waypoints(track_selection) {
-                if !waypoints.is_empty() {
-                    let profile_title = format!(
-                        "Profil d'altitude - Trace {}",
-                        self.track_name(track_selection)
-                            .filter(|name| !name.trim().is_empty())
-                            .unwrap_or_else(|| "Sans nom".to_owned())
-                    );
-                    self.open_temp_altitude_profile(profile_title, waypoints);
-                }
-            }
+        if open_track_profile
+            && let Some(waypoints) = self.track_waypoints(track_selection)
+            && !waypoints.is_empty()
+        {
+            let profile_title = format!(
+                "Profil d'altitude - Trace {}",
+                self.track_name(track_selection)
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or_else(|| "Sans nom".to_owned())
+            );
+            self.open_temp_altitude_profile(profile_title, waypoints);
         }
 
         self.metadata_editor_open = open;

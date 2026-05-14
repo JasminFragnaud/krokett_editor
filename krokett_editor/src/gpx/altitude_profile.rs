@@ -100,13 +100,13 @@ fn update_fetch_timeout(
     }
 
     ctx.request_repaint_after(std::time::Duration::from_millis(100));
-    if let Some(start_time) = *fetch_start_time {
-        if ctx.input(|i| i.time) - start_time > 30.0 {
-            log::warn!("Elevation fetch timed out ({title})");
-            *fetch_in_progress = false;
-            *fetch_start_time = None;
-            *fetch_timed_out = true;
-        }
+    if let Some(start_time) = *fetch_start_time
+        && ctx.input(|i| i.time) - start_time > 30.0
+    {
+        log::warn!("Elevation fetch timed out ({title})");
+        *fetch_in_progress = false;
+        *fetch_start_time = None;
+        *fetch_timed_out = true;
     }
 }
 
@@ -237,20 +237,20 @@ impl GpxState {
             return;
         };
 
-        if !self.altitude_profile.fetch_in_progress && !self.altitude_profile.fetch_attempted {
-            if let Some(waypoints) = self.segment_waypoints(segment_selection) {
-                if let Some(start_time) = start_elevation_fetch(
-                    ctx,
-                    "Profil d'altitude",
-                    waypoints,
-                    self.altitude_profile.elevation_results.0.clone(),
-                ) {
-                    self.altitude_profile.fetch_in_progress = true;
-                    self.altitude_profile.fetch_attempted = true;
-                    self.altitude_profile.fetch_start_time = Some(start_time);
-                    self.altitude_profile.fetch_timed_out = false;
-                }
-            }
+        if !self.altitude_profile.fetch_in_progress
+            && !self.altitude_profile.fetch_attempted
+            && let Some(waypoints) = self.segment_waypoints(segment_selection)
+            && let Some(start_time) = start_elevation_fetch(
+                ctx,
+                "Profil d'altitude",
+                waypoints,
+                self.altitude_profile.elevation_results.0.clone(),
+            )
+        {
+            self.altitude_profile.fetch_in_progress = true;
+            self.altitude_profile.fetch_attempted = true;
+            self.altitude_profile.fetch_start_time = Some(start_time);
+            self.altitude_profile.fetch_timed_out = false;
         }
 
         update_fetch_timeout(
@@ -389,18 +389,17 @@ impl GpxState {
 
         if !self.temp_altitude_profile.fetch_in_progress
             && !self.temp_altitude_profile.fetch_attempted
-        {
-            if let Some(start_time) = start_elevation_fetch(
+            && let Some(start_time) = start_elevation_fetch(
                 ctx,
                 &self.temp_altitude_profile.title,
                 &self.temp_altitude_profile.waypoints,
                 self.temp_altitude_profile.elevation_results.0.clone(),
-            ) {
-                self.temp_altitude_profile.fetch_in_progress = true;
-                self.temp_altitude_profile.fetch_attempted = true;
-                self.temp_altitude_profile.fetch_start_time = Some(start_time);
-                self.temp_altitude_profile.fetch_timed_out = false;
-            }
+            )
+        {
+            self.temp_altitude_profile.fetch_in_progress = true;
+            self.temp_altitude_profile.fetch_attempted = true;
+            self.temp_altitude_profile.fetch_start_time = Some(start_time);
+            self.temp_altitude_profile.fetch_timed_out = false;
         }
 
         update_fetch_timeout(
