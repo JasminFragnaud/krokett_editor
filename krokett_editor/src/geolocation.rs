@@ -8,7 +8,7 @@ use walkers::{Position, lon_lat};
 const IP_GEOLOCATION_URL: &str = "https://ipapi.co/json/";
 
 #[cfg(target_os = "android")]
-const ANDROID_PRECISE_REFRESH_INTERVAL: Duration = Duration::from_secs(5);
+const ANDROID_PRECISE_REFRESH_INTERVAL: Duration = Duration::from_secs(4);
 
 #[cfg(target_os = "android")]
 fn android_results() -> &'static Mutex<Vec<Result<Position, String>>> {

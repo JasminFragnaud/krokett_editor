@@ -1,6 +1,9 @@
 .DEFAULT_GOAL := apk
 .PHONY: jni apk run-on-device
 
+# Use Java 21 for Android build compatibility
+export JAVA_HOME ?= /usr/lib/jvm/java-21-temurin-jdk
+
 jni:
 	cd rust && cargo ndk --target arm64-v8a -o ../java/app/src/main/jniLibs/ build --profile release
 
