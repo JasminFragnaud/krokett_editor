@@ -31,7 +31,33 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui, attributions: Vec<Attribution>) {
                     }
                     ui.close();
                 }
+            });
 
+            ui.menu_button("Édition", |ui| {
+                let mut cut_tool = app.gpx_state.cut_tool_enabled();
+                if ui.checkbox(&mut cut_tool, "Segments").changed() {
+                    app.gpx_state.set_cut_tool_enabled(cut_tool);
+                }
+
+                let mut waypoint_tool = app.gpx_state.waypoint_tool_enabled();
+                if ui
+                    .checkbox(&mut waypoint_tool, "Waypoints")
+                    .changed()
+                {
+                    app.gpx_state.set_waypoint_tool_enabled(waypoint_tool);
+                }
+
+                let mut segment_draw_tool = app.gpx_state.segment_draw_tool_enabled();
+                if ui
+                    .checkbox(&mut segment_draw_tool, "Profil altimétrique")
+                    .changed()
+                {
+                    app.gpx_state
+                        .set_segment_draw_tool_enabled(segment_draw_tool);
+                }
+            });
+
+            ui.menu_button("Affichage", |ui| {
                 let mut auto_fit = app.gpx_state.auto_fit_enabled();
                 if ui
                     .checkbox(&mut auto_fit, "Auto-zoom chargement GPX")
@@ -143,34 +169,16 @@ pub fn large_material_button(ui: &mut Ui, text: &str) -> Response {
 }
 
 pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
+    if !app.gpx_state.segment_draw_tool_enabled() && !app.gpx_state.waypoint_tool_enabled() {
+        return;
+    }
+
     Window::new("Découpe segments")
         .collapsible(false)
         .resizable(false)
         .title_bar(false)
         .anchor(Align2::RIGHT_TOP, [-10., 44.])
         .show(ui.ctx(), |ui| {
-            let mut cut_tool = app.gpx_state.cut_tool_enabled();
-            if ui.checkbox(&mut cut_tool, "Édition de segment").changed() {
-                app.gpx_state.set_cut_tool_enabled(cut_tool);
-            }
-
-            let mut waypoint_tool = app.gpx_state.waypoint_tool_enabled();
-            if ui
-                .checkbox(&mut waypoint_tool, "Édition de waypoint")
-                .changed()
-            {
-                app.gpx_state.set_waypoint_tool_enabled(waypoint_tool);
-            }
-
-            let mut segment_draw_tool = app.gpx_state.segment_draw_tool_enabled();
-            if ui
-                .checkbox(&mut segment_draw_tool, "Profil altimétrique")
-                .changed()
-            {
-                app.gpx_state
-                    .set_segment_draw_tool_enabled(segment_draw_tool);
-            }
-
             if app.gpx_state.segment_draw_tool_enabled() {
                 let point_count = app.gpx_state.drawing_segment_points().len();
 
