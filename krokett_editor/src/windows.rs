@@ -93,7 +93,7 @@ pub fn top_menu(app: &mut MyApp, ui: &mut Ui, attributions: Vec<Attribution>) {
 
                 if app.gpx_state.segment_draw_tool_enabled() {
                     ui.label(
-                        "Segment temporaire activé:\nClic gauche : ajouter un point, clic droit : annuler le dernier point,\nBouton Profil temporaire : afficher montée/descente",
+                        "Profil altimétrique activé:\nClic gauche : ajouter un point, clic droit : annuler le dernier point,\nBouton Profil temporaire : afficher montée/descente",
                     );
                 }
 
@@ -164,7 +164,7 @@ pub fn cut_tool_controls(app: &mut MyApp, ui: &Ui) {
 
             let mut segment_draw_tool = app.gpx_state.segment_draw_tool_enabled();
             if ui
-                .checkbox(&mut segment_draw_tool, "Segment temporaire")
+                .checkbox(&mut segment_draw_tool, "Profil altimétrique")
                 .changed()
             {
                 app.gpx_state

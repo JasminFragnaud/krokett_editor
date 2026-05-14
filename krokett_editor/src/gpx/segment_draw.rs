@@ -161,7 +161,7 @@ impl GpxState {
             .map(|pos| gpx::Waypoint::new(Point::new(pos.x(), pos.y())))
             .collect();
 
-        self.open_temp_altitude_profile("Profil d'altitude - Segment temporaire", waypoints);
+        self.open_temp_altitude_profile("Profil altimétrique", waypoints);
     }
 
     pub(crate) fn consume_draw_segment_action(&mut self, action: PendingDrawSegmentAction) {
