@@ -4,8 +4,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
 import android.view.MotionEvent;
@@ -31,9 +33,14 @@ public class MainActivity extends GameActivity {
   private static final int REQUEST_OPEN_GPX = 1001;
   private static final int REQUEST_SAVE_GPX = 1002;
   private static final int REQUEST_LOCATION_PERMISSION = 1003;
+  private static final int REQUEST_BACKGROUND_LOCATION_PERMISSION = 1004;
+  private static final long LOCATION_UPDATE_INTERVAL_MS = 5000L;
 
   private static MainActivity instance;
   private static byte[] pendingSaveData;
+  private static LocationManager locationManager;
+  private static LocationListener locationListener;
+  private static boolean locationUpdatesActive;
 
   static {
     System.loadLibrary("main");
@@ -43,6 +50,10 @@ public class MainActivity extends GameActivity {
   private static native void nativeOnGpxOpened(String name, byte[] data, String error);
   private static native void nativeOnGpxSaved(String fileName, String error);
   private static native void nativeOnLocationUpdated(double latitude, double longitude, String error);
+
+  static void publishLocation(double latitude, double longitude, String error) {
+    nativeOnLocationUpdated(latitude, longitude, error);
+  }
 
   public static void requestDeviceLocation() {
     if (instance == null) {
@@ -69,14 +80,41 @@ public class MainActivity extends GameActivity {
     }
 
     fetchLocation();
+    requestBackgroundLocationPermissionIfNeeded();
+  }
+
+  private boolean hasBackgroundLocationPermission() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+      return true;
+    }
+
+    return ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        == PackageManager.PERMISSION_GRANTED;
+  }
+
+  private void requestBackgroundLocationPermissionIfNeeded() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+      return;
+    }
+
+    if (hasBackgroundLocationPermission()) {
+      return;
+    }
+
+    ActivityCompat.requestPermissions(
+        this,
+        new String[] {
+            android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+        },
+        REQUEST_BACKGROUND_LOCATION_PERMISSION);
   }
 
   @SuppressWarnings("deprecation")
   private void fetchLocation() {
     try {
-      LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+      locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
       if (locationManager == null) {
-        nativeOnLocationUpdated(Double.NaN, Double.NaN, "LocationManager indisponible");
+        publishLocation(Double.NaN, Double.NaN, "LocationManager indisponible");
         return;
       }
 
@@ -86,18 +124,34 @@ public class MainActivity extends GameActivity {
       }
 
       if (lastKnown != null) {
-        nativeOnLocationUpdated(lastKnown.getLatitude(), lastKnown.getLongitude(), null);
-        return;
+        publishLocation(lastKnown.getLatitude(), lastKnown.getLongitude(), null);
       }
 
-      locationManager.requestSingleUpdate(
-          LocationManager.GPS_PROVIDER,
-          location -> nativeOnLocationUpdated(location.getLatitude(), location.getLongitude(), null),
-          Looper.getMainLooper());
+      if (locationListener == null) {
+        locationListener = location -> publishLocation(location.getLatitude(), location.getLongitude(), null);
+      }
+
+      if (!locationUpdatesActive) {
+        locationManager.requestLocationUpdates(
+            LocationManager.GPS_PROVIDER,
+            LOCATION_UPDATE_INTERVAL_MS,
+            0f,
+            locationListener,
+            Looper.getMainLooper());
+        locationManager.requestLocationUpdates(
+            LocationManager.NETWORK_PROVIDER,
+            LOCATION_UPDATE_INTERVAL_MS,
+            0f,
+            locationListener,
+            Looper.getMainLooper());
+        locationUpdatesActive = true;
+      }
+
+      LocationForegroundService.start(this);
     } catch (SecurityException e) {
-      nativeOnLocationUpdated(Double.NaN, Double.NaN, "Permission GPS refusee: " + e.getMessage());
+      publishLocation(Double.NaN, Double.NaN, "Permission GPS refusee: " + e.getMessage());
     } catch (Exception e) {
-      nativeOnLocationUpdated(Double.NaN, Double.NaN, "Erreur geolocalisation: " + e.getMessage());
+      publishLocation(Double.NaN, Double.NaN, "Erreur geolocalisation: " + e.getMessage());
     }
   }
 
@@ -189,6 +243,13 @@ public class MainActivity extends GameActivity {
       public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
+        if (requestCode == REQUEST_BACKGROUND_LOCATION_PERMISSION) {
+          if (!hasBackgroundLocationPermission()) {
+            publishLocation(Double.NaN, Double.NaN, "Permission GPS arriere-plan refusee");
+          }
+          return;
+        }
+
         if (requestCode != REQUEST_LOCATION_PERMISSION) {
           return;
         }
@@ -203,6 +264,7 @@ public class MainActivity extends GameActivity {
 
         if (granted) {
           fetchLocation();
+          requestBackgroundLocationPermissionIfNeeded();
         } else {
           nativeOnLocationUpdated(Double.NaN, Double.NaN, "Permission GPS refusee");
         }
@@ -301,11 +363,15 @@ public class MainActivity extends GameActivity {
       protected void onPause() {
         super.onPause();
         setAppInBackground(true);
+        if (locationUpdatesActive) {
+          LocationForegroundService.start(this);
+        }
       }
 
       @Override
       protected void onResume() {
         super.onResume();
         setAppInBackground(false);
+        LocationForegroundService.stop(this);
       }
 }
