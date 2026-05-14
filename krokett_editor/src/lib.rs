@@ -25,7 +25,7 @@ use crate::{
     windows::{clear_gpx_confirmation_modal, cut_tool_controls, zoom},
 };
 use anyhow::Result;
-use egui::{CentralPanel, Context, Frame, Panel, Theme, Visuals};
+use egui::{CentralPanel, Context, Frame, Panel, Visuals};
 use tiles::{Provider, TilesKind, providers};
 use walkers::{Map, MapMemory};
 
@@ -49,10 +49,7 @@ impl MyApp {
     }
 
     pub fn new(egui_ctx: Context) -> Self {
-        let dark_mode = egui_ctx
-            .system_theme()
-            .map(|theme| matches!(theme, Theme::Dark))
-            .unwrap_or_else(|| egui_ctx.global_style().visuals.dark_mode);
+        let dark_mode = false;
         if dark_mode {
             egui_ctx.set_global_style(style::amoled_friendly());
         } else {
