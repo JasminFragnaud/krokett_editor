@@ -22,7 +22,7 @@ use std::{
 use crate::{
     file_utils::{FileContent, FileName},
     map_scale::scale_bar,
-    windows::{clear_gpx_confirmation_modal, cut_tool_controls, map_selector, zoom},
+    windows::{clear_gpx_confirmation_modal, cut_tool_controls, zoom},
 };
 use anyhow::Result;
 use egui::{CentralPanel, Context, Frame, Panel, Theme, Visuals};
@@ -220,8 +220,16 @@ impl eframe::App for MyApp {
         self.gpx_state
             .handle_dropped_files(ui, &mut self.map_memory);
 
+        let map_attributions: Vec<_> = self
+            .providers
+            .get(&self.selected_provider)
+            .unwrap()
+            .iter()
+            .map(|tile| tile.as_ref().attribution())
+            .collect();
+
         Panel::top("main_menu").show_inside(ui, |ui| {
-            windows::top_menu(self, ui);
+            windows::top_menu(self, ui, map_attributions);
         });
 
         self.gpx_state.show_tree_window(ui);
@@ -235,10 +243,6 @@ impl eframe::App for MyApp {
                 let my_position = self.geolocation.position().unwrap_or_else(places::amancy);
 
                 let tiles = self.providers.get_mut(&self.selected_provider).unwrap();
-                let attributions: Vec<_> = tiles
-                    .iter()
-                    .map(|tile| tile.as_ref().attribution())
-                    .collect();
 
                 let mut map =
                     Map::new(None, &mut self.map_memory, my_position).zoom_with_ctrl(false);
@@ -281,7 +285,6 @@ impl eframe::App for MyApp {
                     cut_tool_controls(self, ui);
                     zoom(ui, &mut self.map_memory);
                     scale_bar(ui, &self.map_memory, my_position);
-                    map_selector(self, ui, attributions);
                 }
             });
 

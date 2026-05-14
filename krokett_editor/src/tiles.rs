@@ -6,10 +6,10 @@ use walkers::{HttpOptions, HttpTiles, Tiles};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Provider {
+    OpenStreetMapWithGeoportal,
     OpenStreetMap,
     IgnRandonnee25k,
     IgnRandonnee25kPentes,
-    OpenStreetMapWithGeoportal,
     MapboxStreets,
     MapboxSatellite,
 }
@@ -107,6 +107,22 @@ pub(crate) fn providers(egui_ctx: Context) -> BTreeMap<Provider, Vec<TilesKind>>
     let ign_api_key = std::env::var("IGN_API_KEY").unwrap_or_else(|_| "ign_scan_ws".to_string());
 
     providers.insert(
+        Provider::OpenStreetMapWithGeoportal,
+        vec![
+            TilesKind::Http(HttpTiles::with_options(
+                walkers::sources::OpenStreetMap,
+                http_options(),
+                egui_ctx.to_owned(),
+            )),
+            TilesKind::Http(HttpTiles::with_options(
+                walkers::sources::Geoportal,
+                http_options(),
+                egui_ctx.to_owned(),
+            )),
+        ],
+    );
+
+    providers.insert(
         Provider::OpenStreetMap,
         vec![TilesKind::Http(HttpTiles::with_options(
             walkers::sources::OpenStreetMap,
@@ -138,22 +154,6 @@ pub(crate) fn providers(egui_ctx: Context) -> BTreeMap<Provider, Vec<TilesKind>>
             )),
             TilesKind::Http(HttpTiles::with_options(
                 IgnSlopeLayer,
-                http_options(),
-                egui_ctx.to_owned(),
-            )),
-        ],
-    );
-
-    providers.insert(
-        Provider::OpenStreetMapWithGeoportal,
-        vec![
-            TilesKind::Http(HttpTiles::with_options(
-                walkers::sources::OpenStreetMap,
-                http_options(),
-                egui_ctx.to_owned(),
-            )),
-            TilesKind::Http(HttpTiles::with_options(
-                walkers::sources::Geoportal,
                 http_options(),
                 egui_ctx.to_owned(),
             )),
