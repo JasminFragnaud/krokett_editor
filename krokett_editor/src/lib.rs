@@ -5,6 +5,7 @@ mod elevation_service;
 mod file_utils;
 pub mod geolocation;
 mod gpx;
+mod map_scale;
 mod places;
 mod position_indicator;
 mod style;
@@ -20,6 +21,7 @@ use std::{
 
 use crate::{
     file_utils::{FileContent, FileName},
+    map_scale::scale_bar,
     windows::{clear_gpx_confirmation_modal, cut_tool_controls, map_selector, zoom},
 };
 use anyhow::Result;
@@ -278,6 +280,7 @@ impl eframe::App for MyApp {
                 {
                     cut_tool_controls(self, ui);
                     zoom(ui, &mut self.map_memory);
+                    scale_bar(ui, &self.map_memory, my_position);
                     map_selector(self, ui, attributions);
                 }
             });
